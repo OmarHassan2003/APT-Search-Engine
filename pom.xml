@@ -1,0 +1,21 @@
+<dependencies>
+    <!-- MongoDB -->
+    <dependency>
+        <groupId>org.mongodb</groupId>
+        <artifactId>mongodb-driver-sync</artifactId>
+        <version>4.9.1</version>
+    </dependency>
+    <dependency>
+        <groupId>org.mongodb</groupId>
+        <artifactId>bson</artifactId>
+        <version>4.9.1</version>
+    </dependency>
+
+    <!-- Dotenv -->
+    <dependency>
+        <groupId>io.github.cdimascio</groupId>
+        <artifactId>dotenv-java</artifactId>
+        <version>3.0.0</version>
+    </dependency>
+
+</dependencies>
