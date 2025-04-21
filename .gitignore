@@ -1,0 +1,17 @@
+*.class
+
+.vscode/
+
+bin/
+out/
+
+libs/
+
+*.log
+
+.classpath
+.project
+.settings/
+
+.DS_Store
+Thumbs.db
