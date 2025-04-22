@@ -1,10 +1,14 @@
 package src;
 
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
+import java.util.Map;
+import java.util.regex.Pattern;
 import org.jsoup.nodes.Element;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -17,11 +21,15 @@ public class Crawler implements Runnable {
     private int ID = 0;
     private final List<Document> results;
     private final Set<String> visitedURLs;
+    private final Set<String> roboSet;
+    private final Map<String, List<Pattern>> unAllowedURLs;
     private static final int MAX_PAGES = 100;
-    private static final int MAX_THREADS = 10;
 
     public Crawler(List<String> urls, int id, Set<String> visitedURLs, List<Document> results,
-            Queue<String> urlFrontier) {
+            Queue<String> urlFrontier, Set<String> roboSet,
+            Map<String, List<Pattern>> unAllowedURLs) {
+        this.roboSet = roboSet;
+        this.unAllowedURLs = unAllowedURLs;
         this.seedURLs = urls;
         this.urlFrontier = urlFrontier;
         this.ID = id;
@@ -35,7 +43,14 @@ public class Crawler implements Runnable {
         try {
             for (String url : seedURLs) {
                 url = URLNormalizer.normalizeToCompactString(url);
-                urlFrontier.add(url);
+                synchronized (visitedURLs) {
+                    if (visitedURLs.contains(url))
+                        continue;
+                    visitedURLs.add(url);
+                }
+                synchronized (urlFrontier) {
+                    urlFrontier.add(url);
+                }
 
             }
             crawl();
@@ -47,7 +62,9 @@ public class Crawler implements Runnable {
     private void crawl() {
         while (results.size() < MAX_PAGES) {
             String url;
-            url = urlFrontier.poll();
+            synchronized (urlFrontier) {
+                url = urlFrontier.poll();
+            }
             if (url == null) {
                 try {
                     Thread.sleep(10);
@@ -56,24 +73,58 @@ public class Crawler implements Runnable {
                 }
                 continue;
             }
-            if (!visitedURLs.add(url)) {
-                continue;
+            String base = null;
+            try {
+                URL baseURL = URI.create(url).toURL();
+                base = baseURL.getProtocol() + "://" + baseURL.getHost();
+                if (!roboSet.contains(base)) {
+                    List<Pattern> disallowed = RobotParser.parse(base);
+                    if (disallowed != null) {
+                        synchronized (roboSet) {
+                            roboSet.add(base);
+                        }
+                        synchronized (unAllowedURLs) {
+                            unAllowedURLs.put(base, disallowed);
+                        }
+                    }
+
+                }
+            } catch (Exception e) {
+                System.out.println("Error parsing URL: " + e.getMessage());
             }
-            // Mark as visited BEFORE downloading to prevent other threads from processing
+            if (base != null && roboSet.contains(base)) {
+                List<Pattern> disallowed = unAllowedURLs.get(base);
+                if (disallowed != null) {
+                    if (RobotParser.isDisallowed(url, disallowed)) {
+                        continue;
+                    }
+                }
+            }
             Document doc = downloadPage(url);
             if (doc == null) {
                 continue;
             }
-            results.add(doc);
+            synchronized (results) {
+                results.add(doc);
+            }
             List<String> links = extractLinks(doc);
             try {
                 for (String link : links) {
                     link = URLNormalizer.normalizeToCompactString(link);
                     if (link == null) {
-                        continue; // Skip null links
+                        continue;
                     }
                     if (!visitedURLs.contains(link)) {
-                        urlFrontier.add(link);
+                        synchronized (visitedURLs) {
+                            if (visitedURLs.contains(link)) // add to visited when adding to queue,
+                                                            // not when poping from queue to ensure
+                                                            // no duplicates
+                                continue;
+                            visitedURLs.add(link);
+                        }
+                        synchronized (urlFrontier) {
+                            urlFrontier.add(link);
+                        }
                     }
                 }
             } catch (URISyntaxException e) {
@@ -89,7 +140,7 @@ public class Crawler implements Runnable {
             String absURL = link.attr("abs:href");
 
             String normalizedURL = (absURL);
-            if (normalizedURL != null) { // Only add if not null
+            if (normalizedURL != null) {
                 links.add(normalizedURL);
             }
         }

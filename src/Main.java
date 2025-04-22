@@ -1,21 +1,30 @@
 package src;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
+import java.util.Scanner;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.LinkedList;
+import java.util.regex.Pattern;
 import org.jsoup.nodes.Document;
 
 public class Main {
     public static void main(String[] args) {
-        System.out.println("Starting web crawler");
-        int numCrawlers = 10;
+        System.out.println("Starting web crawler, how many crawlers do you want to run?");
+        System.out.println("Please enter a number between 1 and 20");
+        Scanner scanner = new Scanner(System.in);
+        int numCrawlers = scanner.nextInt();
+        scanner.close();
         List<String> seedURLs = new ArrayList<>();
-        Queue<String> urlFrontier = new ConcurrentLinkedQueue<>();
-        List<Document> results = Collections.synchronizedList(new ArrayList<>());
+        Queue<String> urlFrontier = new LinkedList<>();
+        List<Document> results = new ArrayList<>();
 
         seedURLs.add("https://www.bbc.com");
         seedURLs.add("https://www.cnn.com");
@@ -43,13 +52,16 @@ public class Main {
         seedURLs.add("https://www.reddit.com");
         seedURLs.add("https://www.medium.com");
 
-        Set<String> visitedURLs = Collections.synchronizedSet(new HashSet<>());
+        Set<String> visitedURLs = new HashSet<>();
+        Set<String> robotURLs = new HashSet<>();
+        Map<String, List<Pattern>> unAllowedURLs = new HashMap<>();
 
         try {
             long startTime = System.currentTimeMillis();
             List<Thread> threads = new ArrayList<>(10);
             for (int i = 0; i < numCrawlers; i++) {
-                Crawler crawler = new Crawler(seedURLs, i, visitedURLs, results, urlFrontier);
+                Crawler crawler = new Crawler(seedURLs, i, visitedURLs, results, urlFrontier,
+                        robotURLs, unAllowedURLs);
                 threads.add(new Thread(crawler));
                 threads.get(i).start();
             }
@@ -62,5 +74,18 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        // Uncomment below to save output
+        /*
+         * try (BufferedWriter writer = new BufferedWriter(new FileWriter("output.txt"))) { for
+         * (Document doc : results) { writer.write(doc.title()); writer.newLine();
+         * writer.write(doc.baseUri()); writer.newLine();
+         * writer.write("--------------------------------------------------"); writer.newLine();
+         * writer.write(doc.body().text()); writer.newLine();
+         * writer.write("=================================================="); writer.newLine();
+         * writer.write("=================================================="); writer.newLine(); }
+         * System.out.println("Results written to output.txt"); } catch (IOException e) {
+         * e.printStackTrace(); }
+         */
     }
 }
