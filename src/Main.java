@@ -53,7 +53,7 @@ public class Main {
         seedURLs.add("https://www.medium.com");
 
         Set<String> visitedURLs = new HashSet<>();
-        Set<String> robotURLs = new HashSet<>();
+        Set<String> visitedDocs = new HashSet<>();
         Map<String, List<Pattern>> unAllowedURLs = new HashMap<>();
 
         try {
@@ -61,7 +61,7 @@ public class Main {
             List<Thread> threads = new ArrayList<>(10);
             for (int i = 0; i < numCrawlers; i++) {
                 Crawler crawler = new Crawler(seedURLs, i, visitedURLs, results, urlFrontier,
-                        robotURLs, unAllowedURLs);
+                        unAllowedURLs, visitedDocs);
                 threads.add(new Thread(crawler));
                 threads.get(i).start();
             }

@@ -2,6 +2,10 @@ package src;
 
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.math.BigInteger;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,14 +25,14 @@ public class Crawler implements Runnable {
     private int ID = 0;
     private final List<Document> results;
     private final Set<String> visitedURLs;
-    private final Set<String> roboSet;
+    private final Set<String> visitedDocs;
     private final Map<String, List<Pattern>> unAllowedURLs;
     private static final int MAX_PAGES = 100;
 
     public Crawler(List<String> urls, int id, Set<String> visitedURLs, List<Document> results,
-            Queue<String> urlFrontier, Set<String> roboSet,
-            Map<String, List<Pattern>> unAllowedURLs) {
-        this.roboSet = roboSet;
+            Queue<String> urlFrontier, Map<String, List<Pattern>> unAllowedURLs,
+            Set<String> visitedDocs) {
+        this.visitedDocs = visitedDocs;
         this.unAllowedURLs = unAllowedURLs;
         this.seedURLs = urls;
         this.urlFrontier = urlFrontier;
@@ -36,7 +40,6 @@ public class Crawler implements Runnable {
         this.visitedURLs = visitedURLs;
         this.results = results;
     }
-
 
     @Override
     public void run() {
@@ -77,12 +80,9 @@ public class Crawler implements Runnable {
             try {
                 URL baseURL = URI.create(url).toURL();
                 base = baseURL.getProtocol() + "://" + baseURL.getHost();
-                if (!roboSet.contains(base)) {
+                if (!visitedURLs.contains(base)) {
                     List<Pattern> disallowed = RobotParser.parse(base);
                     if (disallowed != null) {
-                        synchronized (roboSet) {
-                            roboSet.add(base);
-                        }
                         synchronized (unAllowedURLs) {
                             unAllowedURLs.put(base, disallowed);
                         }
@@ -92,7 +92,7 @@ public class Crawler implements Runnable {
             } catch (Exception e) {
                 System.out.println("Error parsing URL: " + e.getMessage());
             }
-            if (base != null && roboSet.contains(base)) {
+            if (base != null && unAllowedURLs.containsKey(base)) {
                 List<Pattern> disallowed = unAllowedURLs.get(base);
                 if (disallowed != null) {
                     if (RobotParser.isDisallowed(url, disallowed)) {
@@ -103,6 +103,17 @@ public class Crawler implements Runnable {
             Document doc = downloadPage(url);
             if (doc == null) {
                 continue;
+            }
+            try {
+                String hashedDoc = sha256Hash(doc); // in case two urls point to the same page
+                synchronized (visitedDocs) {
+                    if (visitedDocs.contains(hashedDoc)) {
+                        continue;
+                    }
+                    visitedDocs.add(hashedDoc);
+                }
+            } catch (NoSuchAlgorithmException e) {
+                System.out.println("Error hashing document: " + e.getMessage());
             }
             synchronized (results) {
                 results.add(doc);
@@ -163,5 +174,22 @@ public class Crawler implements Runnable {
             System.out.println("Error downloading " + url + ": " + e.getMessage());
             return null;
         }
+    }
+
+    public static String sha256Hash(Document doc) throws NoSuchAlgorithmException {
+        String html = doc.html(); // Convert Document to HTML string
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hashBytes = digest.digest(html.getBytes(StandardCharsets.UTF_8));
+
+        // Convert to hex string
+        BigInteger number = new BigInteger(1, hashBytes);
+        StringBuilder hexString = new StringBuilder(number.toString(16));
+
+        // Pad with leading zeros if needed
+        while (hexString.length() < 64) {
+            hexString.insert(0, '0');
+        }
+
+        return hexString.toString();
     }
 }
