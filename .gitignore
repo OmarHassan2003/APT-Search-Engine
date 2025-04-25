@@ -1,9 +1,16 @@
+
+.idea/
+
 *.class
 
 .vscode/
 
+
 bin/
 out/
+
+
+*.class
 
 libs/
 
