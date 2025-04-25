@@ -10,20 +10,25 @@ import java.util.List;
 public class Tokenizer {
 
     public class Token {
-        public String word;
-        public double count;
-        public String position;
+    public String word;
+    public double count;
+    public List<Integer> positions;
 
-        public Token(String word) {
-            this.word = word;
-            this.count = 1;
-            this.position = "other";
-        }
-
-        public void increment() {
-            this.count++;
-        } 
+    public Token(String word) {
+        this.word = word;
+        this.count = 1;
+        this.positions = new ArrayList<>();
     }
+
+    public void increment() {
+        this.count++;
+    }
+
+    public void addPosition(int pos) {
+        this.positions.add(pos);
+    }
+}
+
 
     private HashSet<String> stopWords;
 
@@ -54,11 +59,17 @@ public class Tokenizer {
 
         // calculate the occurance of each token
 
-        for(String token : tokens)  {
+        for (int i = 0; i < tokens.size(); i++) {
+            String token = tokens.get(i);
+            if (token.isBlank()) continue;
+    
             if (tokenMap.containsKey(token)) {
                 tokenMap.get(token).increment();
+                tokenMap.get(token).addPosition(i);
             } else {
-                tokenMap.put(token, new Token(token));
+                Token t = new Token(token);
+                t.addPosition(i);
+                tokenMap.put(token, t);
             }
         }
 
@@ -70,9 +81,14 @@ public class Tokenizer {
         }
 
         /*
+            For Ranker:
+
             Discuss with Document Model creator
             how to define the position of the document
+        
         */
+
+        return tokenMap;
     }
 
     public List<String> tokenizeString(String text) {
@@ -83,7 +99,11 @@ public class Tokenizer {
 
         for (String word : words) {
             
-            // TODO: Stemming should be here
+            /*
+                TODO: 
+                    Stemming should be here for query searching 
+                    (Tony want to merge)
+            */
 
             tokens.add(word);
         }
