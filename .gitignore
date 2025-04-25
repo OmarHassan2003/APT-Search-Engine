@@ -24,3 +24,6 @@ out/
 *.iws
 target/
 
+.env
+docker.env
+
