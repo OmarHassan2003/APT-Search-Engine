@@ -15,3 +15,12 @@ libs/
 
 .DS_Store
 Thumbs.db
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+*.ipr
+*.iws
+target/
+
