@@ -2,15 +2,15 @@ package src;
 
 import java.util.*;
 
-public class Document {
+public class Documents {
   private String url;
   private String title;
   private Map<String, Integer> wordOccurences;
   private Map<String, List<String>> wordPositions;
   private int totalWords;
-  private List<Document> referedToDocuments;
+  private List<Documents> referedToDocuments;
 
-  public Document(String url, String title, Map<String, Integer> wordOccurences, Map<String, List<String>> wordPositions) {
+  public Documents(String url, String title, Map<String, Integer> wordOccurences, Map<String, List<String>> wordPositions) {
     this.url = url;
     this.title = title;
     this.wordOccurences = wordOccurences;
@@ -23,7 +23,7 @@ public class Document {
     System.out.println("total words " + totalWords);
   }
 
-  public void setReferedTo(List<Document> referedTo) {
+  public void setReferedTo(List<Documents> referedTo) {
     this.referedToDocuments = referedTo;
   }
 
@@ -35,5 +35,5 @@ public class Document {
 
   public List<String> getWordPositions(String word) {return wordPositions.getOrDefault(word, Collections.emptyList());}
 
-  public List<Document> getReferedTo() {return referedToDocuments;}
+  public List<Documents> getReferedTo() {return referedToDocuments;}
 }

@@ -1,6 +1,5 @@
 package src;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,19 +37,19 @@ public class main {
     wordPositions3.put("Magdy", List.of("h1"));
     wordPositions3.put("Nabil", List.of("h5", "h3", "h4", "body"));
 
-    Document doc1 = new Document("www.f1.com", "Greatest Motorsport ever", wordOccurences1 , wordPositions1);
-    Document doc2 = new Document("www.f2.com", "2nd Greatest Motorsport ever", wordOccurences2 , wordPositions2);
-    Document doc3 = new Document("www.f13.com", "3rd Greatest Motorsport ever", wordOccurences3 , wordPositions3);
+    Documents doc1 = new Documents("www.f1.com", "Greatest Motorsport ever", wordOccurences1 , wordPositions1);
+    Documents doc2 = new Documents("www.f2.com", "2nd Greatest Motorsport ever", wordOccurences2 , wordPositions2);
+    Documents doc3 = new Documents("www.f13.com", "3rd Greatest Motorsport ever", wordOccurences3 , wordPositions3);
 
-    List<Document> referedTo1 = List.of(doc2, doc3);
-    List<Document> referedTo2 = List.of(doc3, doc1);
-    List<Document> referedTo3 = List.of(doc1);
+    List<Documents> referedTo1 = List.of(doc2, doc3);
+    List<Documents> referedTo2 = List.of(doc3, doc1);
+    List<Documents> referedTo3 = List.of(doc1);
 
     doc1.setReferedTo(referedTo1);
     doc2.setReferedTo(referedTo2);
     doc3.setReferedTo(referedTo3);
 
-    Document[] tot = {doc1, doc2, doc3};
+    Documents[] tot = {doc1, doc2, doc3};
     Map<String, Integer> docsWithWord = new HashMap<>();
     docsWithWord.put("Omar", 3);
     docsWithWord.put("Magdy", 1);
@@ -61,10 +60,10 @@ public class main {
     Ranker ranker = new Ranker(tot, docsWithWord);
 
     String[] query = {"Omar"};
-    Document[] docs = {doc1, doc2, doc3};
-    List<Document> d = ranker.RankDocuments(query, docs);
+    Documents[] docs = {doc1, doc2, doc3};
+    List<Documents> d = ranker.RankDocuments(query, docs);
 
-    for (Document doc : d) {
+    for (Documents doc : d) {
       System.out.println(doc.getUrl());
     }
   }

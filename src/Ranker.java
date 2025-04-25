@@ -1,16 +1,15 @@
 package src;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 public class Ranker {
-  private Document[] totalDocs;
+  private Documents[] totalDocs;
   private Map<String, Integer> docsWithWord; // word->no of docs containing it
 
-  public Ranker(Document[] totalDocs, Map<String, Integer> docsWithWord) {
+  public Ranker(Documents[] totalDocs, Map<String, Integer> docsWithWord) {
     this.totalDocs = totalDocs;
     this.docsWithWord = docsWithWord;
   }
@@ -28,13 +27,13 @@ public class Ranker {
     }
   }
 
-  private double calculateTFIDF(String word, Document doc) {
+  private double calculateTFIDF(String word, Documents doc) {
     double tf =  (double)doc.getWordsOccurences(word) /doc.getTotalWords();
     double idf = (double) totalDocs.length / (docsWithWord.getOrDefault(word, 1));
     return tf * idf;
   }
 
-  private double calculateRelevance(String[] queryWords, Document doc) {
+  private double calculateRelevance(String[] queryWords, Documents doc) {
     double score = 0.0;
     for(String word : queryWords) {
       double tfidf = calculateTFIDF(word, doc);
@@ -50,19 +49,19 @@ public class Ranker {
     return queryWords.length > 0 ? score / queryWords.length : 0.0;
   }
 
-    private Map<Document, Double> calculatePageRank() {
-      Map<Document, Double> pageRank = new HashMap<>();
+    private Map<Documents, Double> calculatePageRank() {
+      Map<Documents, Double> pageRank = new HashMap<>();
       double dampingFactor = 0.85;
-      for(Document doc : totalDocs) {
+      for(Documents doc : totalDocs) {
         pageRank.put(doc, (double)1 / totalDocs.length);
       }
       for(int i = 0; i < 5; i++) { // mby change this, geeks says 100
-        Map<Document, Double> newRanks = new HashMap<>();
-        for(Document doc1 : totalDocs) {
+        Map<Documents, Double> newRanks = new HashMap<>();
+        for(Documents doc1 : totalDocs) {
           double contribution = 0.0;
-          for(Document doc2 : totalDocs) {
+          for(Documents doc2 : totalDocs) {
             if (!(doc1.getUrl().equals(doc2.getUrl()))) {
-              Document From = doc2;
+              Documents From = doc2;
               if(doc2.getReferedTo().contains(doc1)) {
                 contribution += pageRank.get(From) / doc2.getReferedTo().size();
               }
@@ -71,7 +70,7 @@ public class Ranker {
           double newScore = (1 - dampingFactor) + dampingFactor * contribution;
           newRanks.put(doc1, newScore);
         }
-        for(Map.Entry<Document, Double> entry : newRanks.entrySet()) {
+        for(Map.Entry<Documents, Double> entry : newRanks.entrySet()) {
           System.out.println(entry.getKey().getUrl() + " " + entry.getValue());
         }
         System.out.println("-------------------------");
@@ -80,10 +79,10 @@ public class Ranker {
       return pageRank;
     }
 
-  public List<Document> RankDocuments(String[] queryWords, Document[] Docs) {
-    Map<Document, Double> FinalScores = new HashMap<>();
-    Map<Document, Double> pageRankedDocs = calculatePageRank();
-    for (Document doc : Docs) {
+  public List<Documents> RankDocuments(String[] queryWords, Documents[] Docs) {
+    Map<Documents, Double> FinalScores = new HashMap<>();
+    Map<Documents, Double> pageRankedDocs = calculatePageRank();
+    for (Documents doc : Docs) {
       double relevance = calculateRelevance(queryWords, doc);
       System.out.println(relevance + " " + pageRankedDocs.get(doc));
       double score = 0.6 * relevance + 0.4 * pageRankedDocs.get(doc);
