@@ -1,4 +1,4 @@
-package main.java.indexer;
+package indexer;
 
 import indexer.Tokenizer;
 import indexer.Tokenizer.Token;
@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
+import db.DBManager;
 import javax.swing.text.Document;
 
 public class Indexer {
@@ -31,9 +31,8 @@ public class Indexer {
                 executor.submit(() -> {
                     String title = doc.getString("title");
                     String content = doc.getString("content");
-                    org.jsoup.nodes.Document contentDoc = Jsoup.parse(content);
                     System.out.println("=>Indexing: " + title);
-                    HashMap<String, Token> tokens = tokenizer.tokenizeDoc(contentDoc);
+                    HashMap<String, Token> tokens = tokenizer.tokenizeDoc(content);
                     System.out.println("=>Tokens: " + tokens.size() + " in " + title);
                     try {
                         db.insertInverted(doc.getObjectId("_id").toString(), tokens);

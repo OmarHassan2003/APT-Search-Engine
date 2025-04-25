@@ -1,8 +1,12 @@
-package main.java.db;
+package db;
 
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
+
 import indexer.Tokenizer.Token;
 import org.bson.Document;
 import org.bson.types.ObjectId;

@@ -1,6 +1,7 @@
 package indexer;
 
 import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,9 +33,9 @@ public class Tokenizer {
 
     private HashSet<String> stopWords;
 
-    public Tokenizer(String filename) {
+    public Tokenizer() {
         try {
-            BufferedReader reader = new BufferedReader("../data/stopwords.txt");
+            BufferedReader reader = new BufferedReader(new FileReader("../data/stopwords.txt"));
             String line;
             while ((line = reader.readLine()) != null) {
                 stopWords.add(line.trim());
