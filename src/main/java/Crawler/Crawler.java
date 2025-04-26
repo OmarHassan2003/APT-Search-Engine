@@ -37,7 +37,7 @@ public class Crawler implements Runnable {
     private final MongoCollection<org.bson.Document> URLsCollection;
     private final MongoCollection<org.bson.Document> visitedDocsCollection;
     private final MongoCollection<org.bson.Document> crawledURLsCollection;
-    private static final int MAX_PAGES = 100;
+    private static final int MAX_PAGES = 109;
     private final AtomicInteger pagesCrawled;
 
     public Crawler(List<String> urls, int id, Set<String> visitedURLs, AtomicInteger pagesCrawled,
@@ -125,11 +125,6 @@ public class Crawler implements Runnable {
                     }
                 }
             }
-            if (pagesCrawled.get() >= MAX_PAGES) {
-                break;
-            } else {
-                pagesCrawled.incrementAndGet();
-            }
             org.jsoup.nodes.Document doc = downloadPage(url);
             if (doc == null) {
                 continue;
@@ -162,6 +157,11 @@ public class Crawler implements Runnable {
             ArrayList<String> h456s = new ArrayList<>();
             for (Element h456 : doc.select("h4, h5, h6")) {
                 h456s.add(h456.text());
+            }
+            if (pagesCrawled.get() >= MAX_PAGES) {
+                break;
+            } else {
+                pagesCrawled.incrementAndGet();
             }
             docsCollection.insertOne(new org.bson.Document("title", doc.title()).append("url", url)
                     .append("h1s", h1s).append("h2s", h2s).append("h3s", h3s).append("h456s", h456s)
