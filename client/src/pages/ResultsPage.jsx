@@ -20,6 +20,7 @@ function ResultsPage() {
     try {
       const response = await searchQuery(query);
       setResults(response.results);
+      console.log("Fetched results:", response.results);
     } catch (error) {
       console.error("Error fetching results:", error);
     } finally {

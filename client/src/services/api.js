@@ -8,7 +8,7 @@ const mockResults = [
     title: "Introduction to Computer Science - Cairo University",
     url: "https://www.cu.edu.eg/cs/intro",
     snippet:
-      "This course is an introduction to computer science and programming. Learn about algorithms, data structures, and software engineering principles.",
+      "This course is an introduction to computer science, and software engineering principles.This course is an introduction to computer science, and software engineering principles.",
   },
   {
     id: 3,
