@@ -40,6 +40,21 @@
             <artifactId>jsoup</artifactId>
             <version>1.17.2</version>
         </dependency>
+
+                <!-- BSON Library (optional) -->
+        <dependency>
+            <groupId>org.mongodb</groupId>
+            <artifactId>bson</artifactId>
+            <version>4.9.1</version>
+        </dependency>
+
+        <!-- Dotenv for Java -->
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>dotenv-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -55,22 +70,6 @@
             </plugin>
         </plugins>
     </build>
-
-        <!-- BSON Library (optional) -->
-        <dependency>
-            <groupId>org.mongodb</groupId>
-            <artifactId>bson</artifactId>
-            <version>4.9.1</version>
-        </dependency>
-
-        <!-- Dotenv for Java -->
-        <dependency>
-            <groupId>io.github.cdimascio</groupId>
-            <artifactId>dotenv-java</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-    </dependencies>
-
 
     <repositories>
         <repository>
