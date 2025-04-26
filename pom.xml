@@ -34,6 +34,28 @@
             <version>4.11.1</version>
         </dependency>
 
+        <!-- JSoup HTML parser -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.17.2</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Exec plugin to run Java code -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>Crawler.Main</mainClass> <!-- Change to your main class -->
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
         <!-- BSON Library (optional) -->
         <dependency>
             <groupId>org.mongodb</groupId>
