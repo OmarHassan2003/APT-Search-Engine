@@ -1,9 +1,16 @@
+
+.idea/
+
 *.class
 
 .vscode/
 
+
 bin/
 out/
+
+
+*.class
 
 libs/
 
@@ -17,3 +24,14 @@ client/
 
 .DS_Store
 Thumbs.db
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+*.ipr
+*.iws
+target/
+
+.env
+docker.env
