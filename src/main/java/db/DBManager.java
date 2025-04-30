@@ -131,4 +131,34 @@ public class DBManager {
         );
         System.out.println("[DEBUG] Document marked as indexed: " + docTitle);
     }
+
+    public List<String> getDocumentsForWord(String word) {
+        List<String> docIds = new ArrayList<>();
+        Document query = new Document("term", word);
+        Document result = indexCollection.find(query).first();
+        if (result != null) {
+            Document postings = result.get("postings", Document.class);
+            if (postings != null) {
+                docIds.addAll(postings.keySet());
+            }
+        }
+        return docIds;
+    }
+
+
+    public List<Integer> getPositionsForWord(String word, String docId) {
+        List<Integer> positions = new ArrayList<>();
+        Document query = new Document("term", word);
+        Document result = indexCollection.find(query).first();
+        if (result != null) {
+            Document postings = result.get("postings", Document.class);
+            if (postings != null && postings.containsKey(docId)) {
+                Document docData = postings.get(docId, Document.class);
+                positions = (List<Integer>) docData.get("positions");
+            }
+        }
+        return positions;
+    }
+
 }
+
