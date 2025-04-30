@@ -93,6 +93,24 @@
             <artifactId>dotenv-java</artifactId>
             <version>3.0.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <version>2.0.9</version>
+        </dependency>
+      
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.4.11</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.7</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -108,7 +126,8 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
                 <configuration>
-                    <mainClass>Crawler.Main</mainClass> <!-- Change to your main class -->
+                    <!-- Remove the hardcoded mainClass -->
+                    <!-- <mainClass>Crawler.Main</mainClass> -->
                 </configuration>
             </plugin>
         </plugins>

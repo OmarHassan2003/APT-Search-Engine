@@ -1,6 +1,10 @@
 package processor;
 
+
 import org.apache.lucene.util.fst.PairOutputs;
+
+import db.DBManager;
+
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -8,10 +12,9 @@ import java.util.stream.Collectors;
 
 
 public class QueryProcessor {
-    private final IndexAccess indexAccess;
-
-    public QueryProcessor(IndexAccess indexAccess) {
-        this.indexAccess = indexAccess;
+    private final DBManager db;
+    public QueryProcessor(DBManager db) {
+        this.db = db;
     }
 
     public QueryResult processQuery(String query) {
@@ -54,7 +57,7 @@ public class QueryProcessor {
                 results.add(phraseSearch(tokens));
             } else {
                 String term = Stemmer.stem(part);
-                results.add(new HashSet<>(indexAccess.getDocumentsForWord(term)));
+                results.add(new HashSet<>(db.getDocumentsForWord(term)));
             }
         }
 
@@ -76,7 +79,7 @@ public class QueryProcessor {
         //List<String> tokens = Tokenizer.tokenize(query).stream().map(Stemmer::stem).toList();
         Set<String> results = null;
         for (String token : tokens) {
-            Set<String> docs = new HashSet<>(indexAccess.getDocumentsForWord(token));
+            Set<String> docs = new HashSet<>(db.getDocumentsForWord(token));
             if (results == null) results = docs;
             else results.addAll(docs);
         }
@@ -100,7 +103,7 @@ public class QueryProcessor {
 
     private Set<String> phraseSearch(List<String> terms) {
         Set<String> result = new HashSet<>();
-        List<List<String>> docLists = terms.stream().map(indexAccess::getDocumentsForWord).toList();
+        List<List<String>> docLists = terms.stream().map(db::getDocumentsForWord).toList();
         Set<String> commonDocs = new HashSet<>(docLists.getFirst());
         for (int i = 1; i < docLists.size(); i++) {
             commonDocs.retainAll(docLists.get(i));
@@ -108,11 +111,11 @@ public class QueryProcessor {
 
 
         for (String docId : commonDocs) {
-            List<Integer> firstPositions = indexAccess.getPositionsForWord(terms.getFirst(), docId);
+            List<Integer> firstPositions = db.getPositionsForWord(terms.getFirst(), docId);
             for (int pos : firstPositions) {
                 boolean match = true;
                 for (int i = 1; i < terms.size(); i++) {
-                    List<Integer> positions = indexAccess.getPositionsForWord(terms.get(i), docId);
+                    List<Integer> positions = db.getPositionsForWord(terms.get(i), docId);
                     if (!positions.contains(pos + i)) {
                         match = false;
                         break;
