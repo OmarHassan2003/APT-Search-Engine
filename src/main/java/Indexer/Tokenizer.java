@@ -1,4 +1,4 @@
-package indexer;
+package Indexer;
 
 import processor.Stemmer;
 import java.io.BufferedReader;
@@ -9,7 +9,7 @@ import org.bson.Document;
 
 public class Tokenizer {
 
-   public class Token {
+   public static class Token { // Made static
        public String word;
        public double count;
        public List<Integer> positions;
@@ -35,7 +35,7 @@ public class Tokenizer {
 
    public Tokenizer() {
        stopWords = new HashSet<>(); // Initialize stopWords
-       loadStopWords("../data/stopwords.txt");
+       loadStopWords("./src/main/java/data/stopwords.txt"); // Use relative path
    }
 
    private void loadStopWords(String filePath) {
@@ -45,58 +45,53 @@ public class Tokenizer {
                stopWords.add(line.trim().toLowerCase());
            }
        } catch (IOException e) {
-           System.err.println("Error loading stop words: " + e.getMessage());
+           System.err.println("Error loading stop words from " + filePath + ": " + e.getMessage());
        }
    }
 
    public HashMap<String, Token> tokenizeDoc(Document doc) {
-       String text = doc.getString("content");
-       if (text == null) {
-           System.out.println("Document content is null");
+       String text = doc.getString("body");
+       if (text == null || text.isBlank()) {
+           System.err.println("[ERROR] Document body is null or empty for document: " + doc.getString("title"));
            return new HashMap<>();
        }
 
-       List<String> tokens = tokenizeString(text);
        HashMap<String, Token> tokenMap = new HashMap<>();
-
-       // Use parallel streams to process tokens
-       tokens.parallelStream().forEach(token -> {
-           if (token.isBlank() || stopWords.contains(token)) return;
-
-           synchronized (tokenMap) { // Synchronize access to the shared map
-               if (tokenMap.containsKey(token)) {
-                   tokenMap.get(token).increment();
+       String[] words = text.toLowerCase().replaceAll("[^a-z0-9]", " ").split("\\s+");
+       
+       for (int i = 0; i < words.length; i++) {
+           String word = words[i];
+           
+           // Skip invalid tokens (too short, numbers, stopwords)
+           if (word.length() <= 1 || word.matches("\\d+") || stopWords.contains(word)) {
+               continue;
+           }
+           
+           try {
+               String stemmedWord = Stemmer.stem(word);
+               if (stemmedWord.isBlank()) continue;
+               
+               if (tokenMap.containsKey(stemmedWord)) {
+                   tokenMap.get(stemmedWord).increment();
+                   tokenMap.get(stemmedWord).addPosition(i);
                } else {
-                   tokenMap.put(token, new Token(token));
+                   Token token = new Token(stemmedWord);
+                   token.addPosition(i);
+                   tokenMap.put(stemmedWord, token);
                }
-           }
-       });
-
-       // Calculate term frequency (TF)
-       tokens.parallelStream().forEach(token -> {
-           synchronized (tokenMap) {
-               if (tokenMap.containsKey(token)) {
-                   tokenMap.get(token).count = tokenMap.get(token).count / tokens.size();
-               }
-           }
-       });
-
-       fillTags(doc, tokenMap);
-       return tokenMap;
-   }
-
-   public List<String> tokenizeString(String text) {
-       List<String> tokens = new ArrayList<>();
-       String currentText = text.toLowerCase().replaceAll("[^a-z0-9]", " "); // Include numbers
-       String[] words = currentText.split("\\s+");
-
-       for (String word : words) {
-           if (!word.isBlank()) {
-               tokens.add(Stemmer.stem(word)); 
+           } catch (Exception e) {
+               System.err.println("[ERROR] Error processing word: " + word + " - " + e.getMessage());
            }
        }
-
-       return tokens;
+       
+       // Calculate term frequency (TF)
+       int totalTerms = tokenMap.values().stream().mapToInt(t -> (int)t.count).sum();
+       if (totalTerms > 0) {
+           tokenMap.forEach((key, token) -> token.count = token.count / totalTerms);
+       }
+       
+       fillTags(doc, tokenMap);
+       return tokenMap;
    }
 
    public void fillTags(Document doc, HashMap<String, Token> tokenMap) {

@@ -4,39 +4,45 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
+
+import Indexer.Tokenizer.Token;
+
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 
-import indexer.Tokenizer.Token;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
 import java.util.*;
 
 public class DBManager {
-   private final MongoCollection<Document> docCollection;
-   private final MongoCollection<Document> indexCollection;
+    private final MongoClient mongoClient;
+    private final MongoCollection<Document> docCollection;
+    private final MongoCollection<Document> indexCollection;
 
-   public DBManager() {
-       String connectionString = "mongodb://localhost:27017";
-       MongoClient mongoClient = MongoClients.create(connectionString);
-       MongoDatabase database = mongoClient.getDatabase("search_engine");
+    public DBManager() {
+        String connectionString = "mongodb://localhost:27017";
+        this.mongoClient = MongoClients.create(connectionString);
+        MongoDatabase database = mongoClient.getDatabase("searchengine");
 
-       this.docCollection = database.getCollection("documents");
-       this.indexCollection = database.getCollection("inverted_index");
-   }
+        this.docCollection = database.getCollection("Documents");
+        this.indexCollection = database.getCollection("inverted_index");
+    }
 
-   public void insertDoc(Document doc) {
-       try {
-         // Insert the document into the collection
+    public void close() {
+        mongoClient.close(); // Properly close the MongoClient
+    }
+
+    public void insertDoc(Document doc) {
+        try {
+            // Insert the document into the collection
             docCollection.insertOne(doc);
-       } catch (Exception e) {
-           System.out.println("Error inserting document: " + e.getMessage());
-       }
-               
-   }
+        } catch (Exception e) {
+            System.out.println("Error inserting document: " + e.getMessage());
+        }
+    }
 
-   // Bulk insert crawled documents
+    // Bulk insert crawled documents
     public void insertDocuments(List<Document> documents) {
         try {
             docCollection.insertMany(documents);
@@ -55,50 +61,74 @@ public class DBManager {
         return docCollection.find(Filters.eq("_id", new ObjectId(id))).first();
     }
 
+    // Fetch unindexed Documents
+    public List<Document> getUnIndexedDocs(int limit) {
+        System.out.println("[DEBUG] Fetching unindexed documents...");
+        List<Document> docs = new ArrayList<>();
+        FindIterable<Document> results = docCollection.find(Filters.eq("isIndexed", false)).limit(limit);
 
+        for (Document doc : results) {
+            System.out.println("[DEBUG] Unindexed document: " + doc.getObjectId("_id"));
+            docs.add(doc);
+        }
 
-   // Fetch unindexed Documents
-   public List<Document> getUnIndexedDocs(int limit) {
-       List<Document> docs = new ArrayList<>();
-       FindIterable<Document> results = docCollection.find(Filters.eq("indexed", false)).limit(limit);
+        System.out.println("[DEBUG] Found " + docs.size() + " unindexed documents.");
+        return docs;
+    }
 
-       for (Document doc : results) docs.add(doc);
+    // Insert tokens into the inverted index
+    public void insertInverted(String docId, HashMap<String, Token> tokens) {
+        System.out.println("[DEBUG] insertInverted called for docId: " + docId + " with " + tokens.size() + " tokens.");
+        if (tokens.isEmpty()) {
+            System.out.println("[DEBUG] No tokens to insert for docId: " + docId);
+            return;
+        }
 
-       return docs;
-   }
+        // Fetch the document's title for reference only
+        Document doc = getDocumentById(docId);
+        String docTitle = doc != null ? doc.getString("title") : "Unknown Title";
 
-   // Insert tokens into the inverted index
-   public void insertInverted(String docId, HashMap<String, Token> tokens) {
-       List<WriteModel<Document>> updates = new ArrayList<>();
+        List<WriteModel<Document>> updates = new ArrayList<>();
 
-       for (Map.Entry<String, Token> entry : tokens.entrySet()) {
-           String term = entry.getKey();
-           Token token = entry.getValue();
+        for (Map.Entry<String, Token> entry : tokens.entrySet()) {
+            String term = entry.getKey();
+            Token token = entry.getValue();
 
-           Document docPosting = new Document("tf", token.count)
-                                       .append("positions", token.positions)
-                                       .append("tags", token.tags); // Added tags field
+            // Ensure positions are populated
+            if (token.positions.isEmpty()) {
+                System.out.println("[DEBUG] No positions for term: " + term + " in document: " + docTitle);
+                continue;
+            }
 
-           Document setFields = new Document("updated_at", new Date())
-                                      .append("postings." + docId, docPosting);
+            Document docPosting = new Document("tf", token.count)
+                    .append("positions", token.positions)
+                    .append("tags", token.tags)
+                    .append("title", docTitle); // Store title for reference
 
-           UpdateOneModel<Document> updateModel = new UpdateOneModel<>(
-               Filters.eq("term", term),
-               new Document()
-                   .append("$setOnInsert", new Document("term", term))
-                   .append("$set", setFields),
-               new UpdateOptions().upsert(true)
-           );
+            Document setFields = new Document("updated_at", new Date())
+                    .append("postings." + docId, docPosting); // Use document ID as the key
 
-           updates.add(updateModel);
-       }
+            UpdateOneModel<Document> updateModel = new UpdateOneModel<>(
+                    Filters.eq("term", term),
+                    new Document()
+                            .append("$setOnInsert", new Document("term", term))
+                            .append("$set", setFields),
+                    new UpdateOptions().upsert(true)
+            );
 
-       if (!updates.isEmpty()) {
-           indexCollection.bulkWrite(updates); // ⬅ bulk operation
-       }
+            updates.add(updateModel);
+        }
 
-       docCollection.updateOne(Filters.eq("_id", new ObjectId(docId)), Updates.set("indexed", true));
-   }
+        if (!updates.isEmpty()) {
+            indexCollection.bulkWrite(updates);
+            System.out.println("[DEBUG] Tokens successfully inserted into inverted_index.");
+        }
 
-
+        // Update the document to mark it as indexed
+        docCollection.updateOne(
+            Filters.eq("_id", new ObjectId(docId)),
+            Updates.set("isIndexed", true)
+        );
+        System.out.println("[DEBUG] Document marked as indexed: " + docTitle);
+    }
 }
