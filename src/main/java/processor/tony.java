@@ -1,28 +1,30 @@
 package processor;
 
 
-public class tony {
-    public static void main(String[] args) {
-        // 1. Connect to your MongoDB inverted index
-        String connectionString = "mongodb://localhost:27017";
-        String databaseName = "search_index";
-        String collectionName = "terms";
+import db.DBManager;
 
-        IndexAccess indexAccess = new IndexAccess(connectionString, databaseName, collectionName);
-        QueryProcessor processor = new QueryProcessor(indexAccess);
+public class tony {
+    private static final DBManager db = new DBManager();
+    public static void main(String[] args) {
+        System.out.println("Running the Query Processor...");
+
+        //IndexAccess indexAccess = new IndexAccess(connectionString, databaseName, collectionName);
+        QueryProcessor processor = new QueryProcessor(db);
 
         // 2. Test your queries
-        testQuery(processor, "\"travel guide\"");
         testQuery(processor, "travel guide");
+        testQuery(processor, "\"travel guide\"");
         testQuery(processor, "\"travel guide\" AND \"europe tips\"");
         testQuery(processor, "\"summer vacat\" AND \"vacat plan\"");
         testQuery(processor, "\"summer vacat\" OR \"fun\"");
         testQuery(processor, "\"vacat plan\" NOT \"summer vacat\"");
-            testQuery(processor, "\"summer\"");
-       testQuery(processor, "\"vacat plan\"");
-       // ( travel "europe jdslk fjlkj" )
+        testQuery(processor, "\"summer\"");
+        testQuery(processor,  "summer");
+        testQuery(processor, "\"vacat plan\"");
 
 
+        System.out.println("finished");
+        db.close();
     }
 
     public static void testQuery(QueryProcessor processor, String query) {
