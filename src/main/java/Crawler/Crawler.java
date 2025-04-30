@@ -37,7 +37,8 @@ public class Crawler implements Runnable {
     private final MongoCollection<org.bson.Document> URLsCollection;
     private final MongoCollection<org.bson.Document> visitedDocsCollection;
     private final MongoCollection<org.bson.Document> crawledURLsCollection;
-    private static final int MAX_PAGES = 109;
+    private final MongoCollection<org.bson.Document> URLsListCollection;
+    private static final int MAX_PAGES = 6000;
     private final AtomicInteger pagesCrawled;
 
     public Crawler(List<String> urls, int id, Set<String> visitedURLs, AtomicInteger pagesCrawled,
@@ -46,7 +47,9 @@ public class Crawler implements Runnable {
             MongoCollection<org.bson.Document> docsCollection,
             MongoCollection<org.bson.Document> URLsCollection,
             MongoCollection<org.bson.Document> visitedDocsCollection,
-            MongoCollection<org.bson.Document> crawledURLsCollection) {
+            MongoCollection<org.bson.Document> crawledURLsCollection,
+            MongoCollection<org.bson.Document> URLsListCollection) {
+        this.URLsListCollection = URLsListCollection;
         this.pagesCrawled = pagesCrawled;
         this.crawledURLs = crawledURLs;
         this.crawledURLsCollection = crawledURLsCollection;
@@ -168,6 +171,11 @@ public class Crawler implements Runnable {
                     .append("body", doc.body().text()).append("isIndexed", false));
             crawledURLsCollection.insertOne(new org.bson.Document("url", url));
             List<String> links = extractLinks(doc);
+
+            // Add the listof URLs
+            URLsListCollection
+                    .insertOne(new org.bson.Document("url", url).append("URLsList", links));
+
             for (String link : links) {
                 try {
                     if (link.contains("{{") || link.contains("}}")) {
