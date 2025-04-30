@@ -37,12 +37,14 @@ public class Main {
         MongoDatabase database = mongoClient.getDatabase("searchengine");
 
         // Access the collection (it will create it if it doesn't exist)
-        MongoCollection<org.bson.Document> docsCollection = database.getCollection("Documents");
+        MongoCollection<org.bson.Document> docsCollection =
+                database.getCollection("Crawled_Documents");
         MongoCollection<org.bson.Document> URLsCollection = database.getCollection("visitedURLs");
         MongoCollection<org.bson.Document> visitedDocsCollection =
                 database.getCollection("hashedDocs");
         MongoCollection<org.bson.Document> crawledURLsCollection =
                 database.getCollection("crawledURLs");
+        MongoCollection<org.bson.Document> URLsListCollection = database.getCollection("URLsList");
 
         for (org.bson.Document url : URLsCollection.find()) {
             String urlString = url.getString("url");
@@ -93,7 +95,7 @@ public class Main {
             for (int i = 0; i < numCrawlers; i++) {
                 Crawler crawler = new Crawler(seedURLs, i, visitedURLs, pagesCrawled, urlFrontier,
                         unAllowedURLs, visitedDocs, crawledURLs, docsCollection, URLsCollection,
-                        visitedDocsCollection, crawledURLsCollection);
+                        visitedDocsCollection, crawledURLsCollection, URLsListCollection);
                 threads.add(new Thread(crawler));
                 threads.get(i).start();
             }
