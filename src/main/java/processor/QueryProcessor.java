@@ -1,6 +1,10 @@
 package processor;
 
+
+import org.apache.lucene.util.fst.PairOutputs;
+
 import db.DBManager;
+
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -49,6 +53,7 @@ public class QueryProcessor {
             if (part.startsWith("\"") && part.endsWith("\"")) {
                 String phrase = part.substring(1, part.length() - 1);
                 List<String> tokens = Tokenizer.tokenize(phrase).stream().map(Stemmer::stem).toList();
+                List<String> fields = new ArrayList<>();
                 results.add(phraseSearch(tokens));
             } else {
                 String term = Stemmer.stem(part);
@@ -128,6 +133,7 @@ public class QueryProcessor {
 
     private List<String> extractQueryWordsWithBoolean(String query) {
         List<String> parts = splitQuery(query);
+        System.out.println("parts: " + parts);
         List<String> queryWords = new ArrayList<>();
         for (String part : parts) {
             if (part.equalsIgnoreCase("AND") || part.equalsIgnoreCase("OR") || part.equalsIgnoreCase("NOT")) continue;
@@ -138,6 +144,7 @@ public class QueryProcessor {
                 queryWords.add(Stemmer.stem(part));
             }
         }
+        System.out.println("queryWords: " + queryWords);
         return queryWords;
     }
 
