@@ -8,6 +8,7 @@ function SearchBar({ initialValue = "", compact = false }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
   const navigate = useNavigate();
   const searchInputRef = useRef(null);
   const suggestionsTimeoutRef = useRef(null);
@@ -94,15 +95,17 @@ function SearchBar({ initialValue = "", compact = false }) {
           />
           <button
             type="submit"
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
-            style={{ borderRadius: "50%" }}
+            className="absolute right-0 top-1/2 transform -translate-y-1/2"
+            style={{ border: "none", background: "transparent" }}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className={compact ? "h-4 w-4" : "h-5 w-5"}
               fill="none"
               viewBox="0 0 24 24"
-              stroke="currentColor"
+              stroke={isHovering ? "#000000" : "#808080"}
             >
               <path
                 strokeLinecap="round"

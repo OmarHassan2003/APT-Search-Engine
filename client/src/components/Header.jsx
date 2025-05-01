@@ -9,8 +9,8 @@ function Header({ minimal = false, query = "" }) {
         <div className="flex items-center">
           {minimal && (
             <>
-              <Link to="/" className="mr-4">
-                <h1 className="text-3xl font-bold text-blue-500">Apt Apt</h1>
+              <Link to="/" className="mr-10">
+                <h2 className="text-3xl font-bold text-blue-500">Apt Apt</h2>
               </Link>
               <div className="flex-grow max-w-xl">
                 <SearchBar initialValue={query} compact={true} />
