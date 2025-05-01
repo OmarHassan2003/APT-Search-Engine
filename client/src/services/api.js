@@ -16,7 +16,7 @@ export const searchQuery = async (query, page) => {
       // Add new query to the beginning
       searchHistory.unshift(query);
       // Keep only the last 10 searches
-      if (searchHistory.length > 10) {
+      if (searchHistory.length > 150) {
         searchHistory.pop();
       }
     } else if (queryIndex > 0) {
