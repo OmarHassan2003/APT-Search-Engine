@@ -31,7 +31,7 @@ public class tony {
 
     public static void testQuery(QueryProcessor processor, String query) {
         System.out.println("Query: " + query);
-        QueryResult result = processor.processQuery(query);
+        QueryResult result = processor.processQuery(query,0,10);
         System.out.println("docIDs: " + result.getDocIds());
         System.out.println("docData: " + result.getDocData());
         System.out.println("Query Type: " + result.getType());

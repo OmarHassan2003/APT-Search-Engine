@@ -10,6 +10,7 @@ public class QueryResult {
     private long time;
     private List<String> queryWords;
     private List<String> queryWordsString;
+    private Integer totalCount;
 
     public QueryResult() {
     }
@@ -60,5 +61,12 @@ public class QueryResult {
 
     public void setQueryWordsString(List<String> queryWordsString) {
         this.queryWordsString = queryWordsString;
+    }
+
+    public Integer getTotalCount() {
+        return totalCount;
+    }
+    public void setTotalCount(Integer totalCount) {
+        this.totalCount = totalCount;
     }
 }

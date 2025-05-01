@@ -21,10 +21,10 @@ public class SearchController {
     }
 
     @GetMapping("/search")
-    public QueryResult search(@RequestParam String query) {
-        QueryResult queryResult =  queryProcessor.processQuery(query);
-
-        return queryResult;
+    public QueryResult search(@RequestParam String query,
+                              @RequestParam(defaultValue = "0") int page,
+                              @RequestParam(defaultValue = "10") int size) {
+        return queryProcessor.processQuery(query, page, size);
     }
 
 }

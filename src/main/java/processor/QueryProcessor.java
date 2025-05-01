@@ -15,7 +15,7 @@ public class QueryProcessor {
         this.db = db;
     }
 
-    public QueryResult processQuery(String query) {
+    public QueryResult processQuery(String query,int page, int size) {
         long start = System.currentTimeMillis();
         List<String> queryWords;
         String type;
@@ -36,6 +36,8 @@ public class QueryProcessor {
             documentData = handleNormal(queryWords);
         }
 
+        int totalCount = documentData.size();
+
         // Convert results to desired format
         List<String> docIds = new ArrayList<>(documentData.keySet());
         List<Map<String, Object>> docData = new ArrayList<>();
@@ -48,20 +50,26 @@ public class QueryProcessor {
             docInfo.put("tf", doc.get("tf"));
             docInfo.put("positions", doc.get("positions"));
             docInfo.put("tags", doc.get("tags"));
-
+            docInfo.put("title", doc.get("title"));
             docData.add(docInfo);
         }
 
         long duration = System.currentTimeMillis() - start;
 
+        int fromIndex = Math.min(page * size, docIds.size());
+        int toIndex = Math.min(fromIndex + size, docIds.size());
+        List<String> paginatedDocIds = docIds.subList(fromIndex, toIndex);
+        List<Map<String, Object>> paginatedDocData = docData.subList(fromIndex, toIndex);
+
         // Create the final result in the desired format
         QueryResult result = new QueryResult();
-        result.setDocIds(docIds);
-        result.setDocData(docData);
+        result.setDocIds(paginatedDocIds);
+        result.setDocData(paginatedDocData);
         result.setType(type);
         result.setTime(duration);
         result.setQueryWords(queryWords);
         result.setQueryWordsString(splitQuery(query));
+        result.setTotalCount(totalCount);
 
         return result;
     }
