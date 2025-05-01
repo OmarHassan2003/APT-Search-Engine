@@ -54,7 +54,8 @@ export const getSuggestions = (query) => {
       item.toLowerCase().includes(query.toLowerCase())
     );
     console.log("Suggestions", suggestions);
-    return suggestions;
+    // Limit the suggestions to a maximum of 5 items
+    return suggestions.slice(0, 5);
   } catch (error) {
     console.error("Error fetching search results:", error);
     throw error; // Re-throw the error to handle it in the calling code

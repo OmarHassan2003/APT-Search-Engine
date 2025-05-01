@@ -12,20 +12,22 @@ function SearchBar({ initialValue = "", compact = false }) {
   const searchInputRef = useRef(null);
   const suggestionsTimeoutRef = useRef(null);
 
+  const fetchSuggestions = (query) => {
+    try {
+      const suggestionsData = getSuggestions(query);
+      setSuggestions(suggestionsData);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
+    }
+  };
+
   useEffect(() => {
     if (isTyping) {
       clearTimeout(suggestionsTimeoutRef.current);
       suggestionsTimeoutRef.current = setTimeout(() => {
-        try {
-          // Remove the query.trim() check to fetch suggestions even when empty
-          const suggestionsData = getSuggestions(query);
-          // Limit suggestions to 5
-          setSuggestions(suggestionsData.slice(0, 5));
-          setShowSuggestions(true);
-        } catch (error) {
-          console.error("Error fetching suggestions:", error);
-        }
-      }, 300);
+        fetchSuggestions(query);
+      }, 100);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -36,23 +38,15 @@ function SearchBar({ initialValue = "", compact = false }) {
     };
   }, [query, isTyping]);
 
+  const handleInputFocus = () => {
+    fetchSuggestions(query);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (query.trim()) {
       navigate(`/search?q=${encodeURIComponent(query.trim())}`);
       setShowSuggestions(false);
-    }
-  };
-
-  const handleInputFocus = () => {
-    // Show suggestions on focus even if query is empty
-    try {
-      const suggestionsData = getSuggestions(query);
-      // Limit suggestions to 5
-      setSuggestions(suggestionsData.slice(0, 5));
-      setShowSuggestions(true);
-    } catch (error) {
-      console.error("Error fetching suggestions:", error);
     }
   };
 
