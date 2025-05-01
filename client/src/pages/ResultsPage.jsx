@@ -14,13 +14,17 @@ function ResultsPage() {
   const query = queryParams.get("q") || "";
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  
 
-  const fetchResults = async (query) => {
+  const fetchResults = async (query,page) => {
     setIsLoading(true);
     try {
-      const response = await searchQuery(query);
-      setResults(response.results);
-      console.log("Fetched results:", response.results);
+      const response = await searchQuery(query,page);
+      setResults(response);
+      setTotalPages(Math.ceil(response.totalCount / 10)); // Assuming 10 results per page
+      console.log("Fetched results:", response);
     } catch (error) {
       console.error("Error fetching results:", error);
     } finally {
@@ -28,26 +32,21 @@ function ResultsPage() {
     }
   };
   useEffect(() => {
-    fetchResults(query);
-  }, [query]);
+    fetchResults(query, page);
+  }, [query,page]);
 
   return (
     (isLoading && <LoadingSpinner />) || (
       <div className="flex flex-col min-h-screen bg-white text-gray-900">
         <Header minimal={true} query={query} />
 
-        <ResultsList
-          results={results}
-          onClick={(result) => {
-            console.log("Result clicked:", result);
-            // Handle result click (e.g., navigate to result details)
-          }}
-        />
+        <ResultsList results={results}/>
+
 
         <Pagination
-          totalPages={10}
-          currentPage={1}
-          onPageChange={(page) => console.log(`Page changed to: ${page}`)}
+          totalPages={totalPages}
+          initialPage={page}
+          onPageChange={setPage}
         />
 
         <div className="mt-auto">

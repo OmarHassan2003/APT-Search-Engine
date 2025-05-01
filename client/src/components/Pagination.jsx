@@ -1,10 +1,10 @@
 import { useState } from "react";
 
-function Pagination({ totalPages = 10, initialPage = 1, onPageChange }) {
+function Pagination({ totalPages = 10, initialPage = 0, onPageChange }) {
   const [page, setPage] = useState(initialPage);
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
+    if (newPage >= 0 && newPage <= totalPages - 1) {
       setPage(newPage);
       if (onPageChange) {
         onPageChange(newPage);
@@ -14,10 +14,10 @@ function Pagination({ totalPages = 10, initialPage = 1, onPageChange }) {
 
   return totalPages > 1 ? (
     <div className="flex items-center justify-left pl-80 pb-16 space-x-4 text-white">
-      {page > 1 && (
+      {(
         <button
           onClick={() => handlePageChange(page - 1)}
-          disabled={page === 1}
+          disabled={page === 0}
           className="flex items-center justify-center px-4 py-2 rounded-md bg-gray-800 border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors"
         >
           <svg
@@ -38,11 +38,11 @@ function Pagination({ totalPages = 10, initialPage = 1, onPageChange }) {
         </button>
       )}
 
-      <div className="px-4 py-2 text-black">Page {page}</div>
-      {page < totalPages && (
+      <div className="px-4 py-2 text-black">Page {page + 1}</div>
+      {(
         <button
           onClick={() => handlePageChange(page + 1)}
-          disabled={page === totalPages}
+          disabled={page === totalPages - 1}
           className="flex items-center justify-center px-4 py-2 rounded-md bg-gray-800 border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors"
         >
           Next
