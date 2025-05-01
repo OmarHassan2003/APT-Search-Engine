@@ -95,7 +95,7 @@ function SearchBar({ initialValue = "", compact = false }) {
           />
           <button
             type="submit"
-            className="absolute right-0 top-1/2 transform -translate-y-1/2"
+            className="absolute right-4 top-1/2 transform -translate-y-1/2"
             style={{ border: "none", background: "transparent" }}
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}

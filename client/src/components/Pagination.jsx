@@ -12,13 +12,13 @@ function Pagination({ totalPages = 10, initialPage = 0, onPageChange }) {
     }
   };
 
-  return totalPages > 1 ? (
-    <div className="flex items-center justify-left pl-80 pb-16 space-x-4 text-white">
-      {(
+  return totalPages >= 0 ? (
+    <div className="flex items-center justify-left ml-10 pl-80 pb-16 space-x-4 text-white">
+      {page > 0 && (
         <button
           onClick={() => handlePageChange(page - 1)}
           disabled={page === 0}
-          className="flex items-center justify-center px-4 py-2 rounded-md bg-gray-800 border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors"
+          className="flex items-center justify-center text-black px-4 py-2 rounded-[5px] border border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed hover:border-gray-700 transition-colors"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -37,13 +37,12 @@ function Pagination({ totalPages = 10, initialPage = 0, onPageChange }) {
           Previous
         </button>
       )}
-
-      <div className="px-4 py-2 text-black">Page {page + 1}</div>
-      {(
+      {page > 0 && <div className="px-2 py-2 text-black">{page + 1}</div>}
+      {page < totalPages - 1 && (
         <button
           onClick={() => handlePageChange(page + 1)}
           disabled={page === totalPages - 1}
-          className="flex items-center justify-center px-4 py-2 rounded-md bg-gray-800 border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors"
+          className="flex items-center justify-center text-black px-4 py-2 rounded-[5px] border border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed hover:border-gray-700 transition-colors"
         >
           Next
           <svg
