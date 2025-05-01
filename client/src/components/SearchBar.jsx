@@ -13,12 +13,14 @@ function SearchBar({ initialValue = "", compact = false }) {
   const suggestionsTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (isTyping && query.trim()) {
+    if (isTyping) {
       clearTimeout(suggestionsTimeoutRef.current);
-      suggestionsTimeoutRef.current = setTimeout(async () => {
+      suggestionsTimeoutRef.current = setTimeout(() => {
         try {
-          const suggestionsData = await getSuggestions(query);
-          setSuggestions(suggestionsData);
+          // Remove the query.trim() check to fetch suggestions even when empty
+          const suggestionsData = getSuggestions(query);
+          // Limit suggestions to 5
+          setSuggestions(suggestionsData.slice(0, 5));
           setShowSuggestions(true);
         } catch (error) {
           console.error("Error fetching suggestions:", error);
@@ -43,8 +45,14 @@ function SearchBar({ initialValue = "", compact = false }) {
   };
 
   const handleInputFocus = () => {
-    if (query.trim() && suggestions.length > 0) {
+    // Show suggestions on focus even if query is empty
+    try {
+      const suggestionsData = getSuggestions(query);
+      // Limit suggestions to 5
+      setSuggestions(suggestionsData.slice(0, 5));
       setShowSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
     }
   };
 
