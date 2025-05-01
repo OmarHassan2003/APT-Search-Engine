@@ -161,6 +161,10 @@ public class Crawler implements Runnable {
             for (Element h456 : doc.select("h4, h5, h6")) {
                 h456s.add(h456.text());
             }
+            ArrayList<String> ps = new ArrayList<>();
+            for (Element p : doc.select("p")) {
+                ps.add(p.text());
+            }
             if (pagesCrawled.get() >= MAX_PAGES) {
                 break;
             } else {
@@ -168,7 +172,7 @@ public class Crawler implements Runnable {
             }
             docsCollection.insertOne(new org.bson.Document("title", doc.title()).append("url", url)
                     .append("h1s", h1s).append("h2s", h2s).append("h3s", h3s).append("h456s", h456s)
-                    .append("body", doc.body().text()).append("isIndexed", false));
+                    .append("ps", ps).append("body", doc.body().text()).append("isIndexed", false));
             crawledURLsCollection.insertOne(new org.bson.Document("url", url));
             List<String> links = extractLinks(doc);
 

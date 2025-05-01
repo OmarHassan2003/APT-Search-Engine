@@ -25,7 +25,7 @@ public class DBManager {
         this.mongoClient = MongoClients.create(connectionString);
         MongoDatabase database = mongoClient.getDatabase("searchengine");
 
-        this.docCollection = database.getCollection("Documents");
+        this.docCollection = database.getCollection("Crawled_Documents");
         this.indexCollection = database.getCollection("inverted_index");
     }
 
@@ -130,6 +130,20 @@ public class DBManager {
             Updates.set("isIndexed", true)
         );
         System.out.println("[DEBUG] Document marked as indexed: " + docTitle);
+    }
+
+    /**
+     * Marks a document as indexed without adding tokens to the inverted index.
+     * Used for documents with null/empty body content.
+     * 
+     * @param docId the ID of the document to mark as indexed
+     */
+    public void markDocumentAsIndexed(String docId) {
+        docCollection.updateOne(
+            Filters.eq("_id", new ObjectId(docId)),
+            Updates.set("isIndexed", true)
+        );
+        System.out.println("[DEBUG] Document marked as indexed without processing: " + docId);
     }
 
     public List<String> getDocumentsForWord(String word) {

@@ -32,7 +32,31 @@ public class Tokenizer {
    }
 
    private Set<String> stopWords;
+   private String processHeadingText(String text) {
+    StringBuilder result = new StringBuilder();
+    String[] words = text.toLowerCase().replaceAll("[^a-z0-9]", " ").split("\\s+");
 
+    for (String word : words) {
+        // Skip short words, numbers, and stop words
+        if (word.length() <= 1 || word.matches("\\d+") || stopWords.contains(word)) {
+            continue;
+        }
+
+        try {
+            String stemmedWord = Stemmer.stem(word);
+            if (!stemmedWord.isBlank()) {
+                if (result.length() > 0) {
+                    result.append(" ");
+                }
+                result.append(stemmedWord);
+            }
+        } catch (Exception e) {
+            System.err.println("Error stemming word: " + word + " - " + e.getMessage());
+        }
+    }
+
+    return result.toString();
+}
    public Tokenizer() {
        stopWords = new HashSet<>(); // Initialize stopWords
        loadStopWords("./src/main/java/data/stopwords.txt"); // Use relative path
@@ -94,58 +118,87 @@ public class Tokenizer {
        return tokenMap;
    }
 
+   private int countOccurrences(String text, String token) {
+       if (text == null || text.isEmpty()) {
+           return 0;
+       }
+       
+       String processedText = processHeadingText(text);
+       int count = 0;
+       int index = 0;
+       
+       while ((index = processedText.indexOf(token, index)) != -1) {
+           count++;
+           index += token.length();
+       }
+       
+       return count;
+   }
+
    public void fillTags(Document doc, HashMap<String, Token> tokenMap) {
        for (String token : tokenMap.keySet()) {
            Token t = tokenMap.get(token);
-
+           t.tags.clear(); // Clear existing tags to rebuild
+           
+           // Process title occurrences
            String title = doc.getString("title");
-           if (title != null && title.toLowerCase().contains(token)) {
+           int titleCount = countOccurrences(title, token);
+           for (int i = 0; i < titleCount; i++) {
                t.tags.add("title");
            }
-
+           
+           // Process h1 occurrences
            List<String> h1s = doc.getList("h1s", String.class);
            if (h1s != null) {
                for (String h1 : h1s) {
-                   if (h1.toLowerCase().contains(token)) {
+                   int h1Count = countOccurrences(h1, token);
+                   for (int i = 0; i < h1Count; i++) {
                        t.tags.add("h1");
-                       break;
                    }
                }
            }
-
+           
+           // Process h2 occurrences
            List<String> h2s = doc.getList("h2s", String.class);
            if (h2s != null) {
                for (String h2 : h2s) {
-                   if (h2.toLowerCase().contains(token)) {
+                   int h2Count = countOccurrences(h2, token);
+                   for (int i = 0; i < h2Count; i++) {
                        t.tags.add("h2");
-                       break;
                    }
                }
            }
-
+           
+           // Process h3 occurrences
            List<String> h3s = doc.getList("h3s", String.class);
            if (h3s != null) {
                for (String h3 : h3s) {
-                   if (h3.toLowerCase().contains(token)) {
+                   int h3Count = countOccurrences(h3, token);
+                   for (int i = 0; i < h3Count; i++) {
                        t.tags.add("h3");
-                       break;
                    }
                }
            }
-
+           
+           // Process h456 occurrences
            List<String> h456s = doc.getList("h456s", String.class);
            if (h456s != null) {
                for (String h456 : h456s) {
-                   if (h456.toLowerCase().contains(token.toLowerCase())) {
+                   int h456Count = countOccurrences(h456, token);
+                   for (int i = 0; i < h456Count; i++) {
                        t.tags.add("h456");
-                       break;
                    }
                }
            }
-
-           String body = doc.getString("body");
-           if (body != null && body.toLowerCase().contains(token)) {
-               t.tags.add("body");
+           
+           // Fill remaining positions with "body" tags
+           int positionsCount = t.positions.size();
+           int tagsCount = t.tags.size();
+           
+           if (tagsCount < positionsCount) {
+               for (int i = 0; i < positionsCount - tagsCount; i++) {
+                   t.tags.add("body");
+               }
            }
        }
    }
