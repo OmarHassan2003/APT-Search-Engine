@@ -2,7 +2,7 @@
 CRAWLER_MAIN_CLASS=Crawler.Main
 INDEXER_MAIN_CLASS=Indexer.Main
 PROCESSOR_MAIN_CLASS=processor.tony
-
+SERVER_MAIN_CLASS=
 # Target to build the Maven project
 build:
 	mvn clean install
@@ -17,6 +17,9 @@ run-indexer: build
 
 run-processor: build
 	mvn exec:java -Dexec.mainClass="$(PROCESSOR_MAIN_CLASS)"
+
+run-server: build
+	mvn exec:java -Dexec.mainClass="$(SERVER_MAIN_CLASS)"
 
 # Target to run tests
 test: build
