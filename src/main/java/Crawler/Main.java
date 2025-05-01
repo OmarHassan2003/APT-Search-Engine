@@ -11,6 +11,7 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import Ranker.Ranker;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -62,6 +63,7 @@ public class Main {
 
 
 
+
         seedURLs.add("https://www.bbc.com");
         seedURLs.add("https://www.cnn.com");
         seedURLs.add("https://www.reuters.com");
@@ -108,6 +110,33 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        Map<String, List<String>> URLGraph = new HashMap<>();
+
+        for (Document doc : collection.find()) {
+            String url = doc.getString("url");
+            List<String> urlsList = (List<String>) doc.get("URLsList");
+
+            if (url != null && urlsList != null) {
+                URLGraph.put(url, urlsList);
+            }
+        }
+
+        Map<String, Double> pageRank = Ranker.calculatePageRank(URLGraph);
+
+        MongoCollection<org.bson.Document> rankCollection = database.getCollection("pageRanks");
+
+        Map<String, Double> pageRank = Ranker.calculatePageRank(URLGraph);
+
+        List<org.bson.Document> documents = new ArrayList<>();
+        for (Map.Entry<String, Double> entry : pageRank.entrySet()) {
+            Document doc = new Document("url", entry.getKey())
+                    .append("rank", entry.getValue());
+            documents.add(doc);
+        }
+
+        rankCollection.insertMany(documents);
+
         mongoClient.close();
     }
 }

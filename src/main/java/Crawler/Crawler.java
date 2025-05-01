@@ -38,7 +38,7 @@ public class Crawler implements Runnable {
     private final MongoCollection<org.bson.Document> visitedDocsCollection;
     private final MongoCollection<org.bson.Document> crawledURLsCollection;
     private final MongoCollection<org.bson.Document> URLsListCollection;
-    private static final int MAX_PAGES = 6000;
+    private static final int MAX_PAGES = 109;
     private final AtomicInteger pagesCrawled;
 
     public Crawler(List<String> urls, int id, Set<String> visitedURLs, AtomicInteger pagesCrawled,
