@@ -2,9 +2,13 @@ package Indexer;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -19,7 +23,8 @@ import Indexer.Tokenizer.Token;
 public class Indexer {
 
    private static DBManager db = new DBManager();
-   private static final int BATCH_SIZE = 20;
+   // Dynamic batch size calculation based on available processors
+   private static final int BATCH_SIZE = Runtime.getRuntime().availableProcessors() * 30;
    private static PrintWriter statsLogger;
    private static long totalTokens = 0;
    private static long totalFetchTime = 0;
@@ -96,17 +101,26 @@ public class Indexer {
    
    public static void index() {
        long startTime = System.currentTimeMillis(); 
-       System.out.println("\u001B[34m[INFO] Starting the indexing process...\u001B[0m");
+       System.out.println("\u001B[34m[INFO] Starting the indexing process with batch size: " + BATCH_SIZE + "...\u001B[0m");
 
        try {
+           // Optimize thread count for indexing
            int numThreads = Runtime.getRuntime().availableProcessors();
+           // Use 2 threads per core, capped at 24 for manageability
+           numThreads = Math.min(numThreads * 2, 24);
+           System.out.println("[INFO] Using " + numThreads + " threads for indexing");
            ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
-           int maxDocumentsToIndex = Integer.MAX_VALUE; // Process all documents
+           Tokenizer[] tokenizers = new Tokenizer[numThreads];
+           for (int i = 0; i < numThreads; i++) {
+               tokenizers[i] = new Tokenizer();
+           }
+
            int documentsIndexed = 0;
            int batchCount = 0;
+           Queue<Document> documentQueue = new ConcurrentLinkedQueue<>();
 
-           while (documentsIndexed < maxDocumentsToIndex) {
+           while (true) {
                long batchStartTime = System.currentTimeMillis();
                List<Document> unindexedDocs = db.getUnIndexedDocs(BATCH_SIZE);
                long fetchTime = System.currentTimeMillis() - batchStartTime;
@@ -119,59 +133,28 @@ public class Indexer {
                    break;
                }
 
-               for (Document doc : unindexedDocs) {
-                   if (documentsIndexed >= maxDocumentsToIndex) {
-                       break;
-                   }
-
-                   final int docIndex = documentsIndexed;
+               documentQueue.addAll(unindexedDocs);
+               documentsIndexed += unindexedDocs.size();
+               
+               CountDownLatch latch = new CountDownLatch(unindexedDocs.size());
+               AtomicInteger threadAssignment = new AtomicInteger(0);
+               
+               for (int i = 0; i < unindexedDocs.size(); i++) {
+                   Document doc = documentQueue.poll();
+                   if (doc == null) break;
+                   
+                   final int threadId = threadAssignment.getAndIncrement() % numThreads;
                    executor.submit(() -> {
-                       String title = doc.getString("title");
-                       
                        try {
-                           // Check if body is null or empty before proceeding with tokenization
-                           String body = doc.getString("body");
-                           if (body == null || body.isBlank()) {
-                               System.out.println("\u001B[33m[WARNING] Document '" + title + "' has null or empty body. Marking as indexed.\u001B[0m");
-                               
-                               // Mark the document as indexed to prevent reprocessing
-                               db.markDocumentAsIndexed(doc.getObjectId("_id").toString());
-                               return;
-                           }
-                           
-                           long tokenizeStartTime = System.currentTimeMillis();
-                           HashMap<String, Token> tokens = new Tokenizer().tokenizeDoc(doc);
-                           long tokenizeTime = System.currentTimeMillis() - tokenizeStartTime;
-                           
-                           synchronized(Indexer.class) {
-                               totalTokenizeTime += tokenizeTime;
-                               totalTokens += tokens.size();
-                           }
-                           
-                           if (tokens.isEmpty()) {
-                               System.out.println("[DEBUG] No tokens generated for document: " + title);
-                           } else {
-                               long dbStartTime = System.currentTimeMillis();
-                               db.insertInverted(doc.getObjectId("_id").toString(), tokens);
-                               long dbTime = System.currentTimeMillis() - dbStartTime;
-                               
-                               synchronized(Indexer.class) {
-                                   totalDbInsertTime += dbTime;
-                               }
-                           }
-                       } catch (Exception e) {
-                           System.err.println("\u001B[31m[ERROR] Error indexing document '" + title + "': " + e.getMessage() + "\u001B[0m");
+                           processDocument(doc, tokenizers[threadId]);
+                       } finally {
+                           latch.countDown();
                        }
                    });
-
-                   documentsIndexed++;
                }
 
-               // Wait for all tasks in the current batch to complete
-               executor.shutdown();
-               if (!executor.awaitTermination(10, TimeUnit.MINUTES)) {
-                   System.err.println("\u001B[31m[ERROR] Executor did not terminate in the specified time.\u001B[0m");
-                   executor.shutdownNow();
+               if (!latch.await(30, TimeUnit.MINUTES)) {
+                   System.err.println("\u001B[31m[ERROR] Timed out waiting for batch to complete\u001B[0m");
                }
                
                long batchEndTime = System.currentTimeMillis();
@@ -181,26 +164,25 @@ public class Indexer {
                System.out.println("\u001B[34m" + batchCompleteMsg + "\u001B[0m");
                
                batchCount++;
-               
-               // Prepare for next batch with a new executor
-               if (documentsIndexed < maxDocumentsToIndex && !unindexedDocs.isEmpty()) {
-                   executor = Executors.newFixedThreadPool(numThreads);
-               }
            }
 
            String completionMsg = "[INFO] Indexed " + documentsIndexed + " documents in " + batchCount + " batches";
            System.out.println("\u001B[36m" + completionMsg + "\u001B[0m");
            
-           // Log the final statistics
            logPerformanceStats(documentsIndexed, batchCount);
+
+           executor.shutdown();
+           if (!executor.awaitTermination(30, TimeUnit.MINUTES)) {
+               System.err.println("\u001B[31m[ERROR] Executor did not terminate in the specified time\u001B[0m");
+               executor.shutdownNow();
+           }
        } catch (InterruptedException e) {
            System.err.println("\u001B[31m[ERROR] Thread pool interrupted: " + e.getMessage() + "\u001B[0m");
-           Thread.currentThread().interrupt(); // Restore interrupted status
+           Thread.currentThread().interrupt();
        } finally {
-           db.close(); // Ensure MongoClient is closed
+           db.close();
            System.out.println("[INFO] MongoClient closed.");
            
-           // Close loggers
            if (statsLogger != null) {
                statsLogger.close();
            }
@@ -212,13 +194,47 @@ public class Indexer {
        String completionMsg = "[INFO] Indexing process completed in " + totalDuration + " ms";
        System.out.println("\u001B[34m" + completionMsg + "\u001B[0m");
        
-       // Log final timing in a separate try-catch to ensure it runs
        try (PrintWriter finalLogger = new PrintWriter(new FileWriter("logs/indexing_summary.log", true))) {
            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
            String timestamp = dtf.format(LocalDateTime.now());
            finalLogger.println(timestamp + ",TotalRunTime," + totalDuration + ",TotalTokens," + totalTokens);
        } catch (IOException e) {
            System.err.println("\u001B[31m[ERROR] Failed to write final timing log: " + e.getMessage() + "\u001B[0m");
+       }
+   }
+   
+   private static void processDocument(Document doc, Tokenizer tokenizer) {
+       String title = doc.getString("title");
+       try {
+           String body = doc.getString("body");
+           if (body == null || body.isBlank()) {
+               System.out.println("\u001B[33m[WARNING] Document '" + title + "' has null or empty body. Marking as indexed.\u001B[0m");
+               db.markDocumentAsIndexed(doc.getObjectId("_id").toString());
+               return;
+           }
+           
+           long tokenizeStartTime = System.currentTimeMillis();
+           HashMap<String, Token> tokens = tokenizer.tokenizeDoc(doc);
+           long tokenizeTime = System.currentTimeMillis() - tokenizeStartTime;
+           
+           synchronized(Indexer.class) {
+               totalTokenizeTime += tokenizeTime;
+               totalTokens += tokens.size();
+           }
+           
+           if (!tokens.isEmpty()) {
+               long dbStartTime = System.currentTimeMillis();
+               db.insertInverted(doc.getObjectId("_id").toString(), tokens);
+               long dbTime = System.currentTimeMillis() - dbStartTime;
+               
+               synchronized(Indexer.class) {
+                   totalDbInsertTime += dbTime;
+               }
+           } else {
+               db.markDocumentAsIndexed(doc.getObjectId("_id").toString());
+           }
+       } catch (Exception e) {
+           System.err.println("\u001B[31m[ERROR] Error indexing document '" + title + "': " + e.getMessage() + "\u001B[0m");
        }
    }
 }

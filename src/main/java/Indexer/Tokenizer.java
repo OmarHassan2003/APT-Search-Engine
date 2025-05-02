@@ -5,11 +5,13 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import org.bson.Document;
 
 public class Tokenizer {
 
-   public static class Token { // Made static
+   public static class Token {
        public String word;
        public double count;
        public List<Integer> positions;
@@ -32,34 +34,39 @@ public class Tokenizer {
    }
 
    private Set<String> stopWords;
+   private static final Pattern NON_ALPHA_NUMERIC = Pattern.compile("[^a-z0-9]");
+   private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+   private static final Pattern DIGITS_ONLY = Pattern.compile("\\d+");
+   private final Map<String, String> stemCache = new ConcurrentHashMap<>(10000);
+
    private String processHeadingText(String text) {
-    StringBuilder result = new StringBuilder();
-    String[] words = text.toLowerCase().replaceAll("[^a-z0-9]", " ").split("\\s+");
+       StringBuilder result = new StringBuilder();
+       String[] words = WHITESPACE.split(NON_ALPHA_NUMERIC.matcher(text.toLowerCase()).replaceAll(" "));
 
-    for (String word : words) {
-        // Skip short words, numbers, and stop words
-        if (word.length() <= 1 || word.matches("\\d+") || stopWords.contains(word)) {
-            continue;
-        }
+       for (String word : words) {
+           if (word.length() <= 1 || DIGITS_ONLY.matcher(word).matches() || stopWords.contains(word)) {
+               continue;
+           }
 
-        try {
-            String stemmedWord = Stemmer.stem(word);
-            if (!stemmedWord.isBlank()) {
-                if (result.length() > 0) {
-                    result.append(" ");
-                }
-                result.append(stemmedWord);
-            }
-        } catch (Exception e) {
-            System.err.println("Error stemming word: " + word + " - " + e.getMessage());
-        }
-    }
+           try {
+               String stemmedWord = Stemmer.stem(word);
+               if (!stemmedWord.isBlank()) {
+                   if (result.length() > 0) {
+                       result.append(" ");
+                   }
+                   result.append(stemmedWord);
+               }
+           } catch (Exception e) {
+               System.err.println("Error stemming word: " + word + " - " + e.getMessage());
+           }
+       }
 
-    return result.toString();
-}
+       return result.toString();
+   }
+
    public Tokenizer() {
-       stopWords = new HashSet<>(); // Initialize stopWords
-       loadStopWords("./src/main/java/data/stopwords.txt"); // Use relative path
+       stopWords = new HashSet<>();
+       loadStopWords("./src/main/java/data/stopwords.txt");
    }
 
    private void loadStopWords(String filePath) {
@@ -76,128 +83,109 @@ public class Tokenizer {
    public HashMap<String, Token> tokenizeDoc(Document doc) {
        String text = doc.getString("body");
        if (text == null || text.isBlank()) {
-           System.err.println("[ERROR] Document body is null or empty for document: " + doc.getString("title"));
            return new HashMap<>();
        }
 
        HashMap<String, Token> tokenMap = new HashMap<>();
-       String[] words = text.toLowerCase().replaceAll("[^a-z0-9]", " ").split("\\s+");
-       
+       String[] words = WHITESPACE.split(NON_ALPHA_NUMERIC.matcher(text.toLowerCase()).replaceAll(" "));
+
        for (int i = 0; i < words.length; i++) {
            String word = words[i];
-           
-           // Skip invalid tokens (too short, numbers, stopwords)
-           if (word.length() <= 1 || word.matches("\\d+") || stopWords.contains(word)) {
+
+           if (word.length() <= 1 || DIGITS_ONLY.matcher(word).matches() || stopWords.contains(word)) {
                continue;
            }
-           
-           try {
-               String stemmedWord = Stemmer.stem(word);
-               if (stemmedWord.isBlank()) continue;
-               
-               if (tokenMap.containsKey(stemmedWord)) {
-                   tokenMap.get(stemmedWord).increment();
-                   tokenMap.get(stemmedWord).addPosition(i);
-               } else {
-                   Token token = new Token(stemmedWord);
-                   token.addPosition(i);
-                   tokenMap.put(stemmedWord, token);
+           String stemmedWord = stemCache.computeIfAbsent(word, w -> {
+               try {
+                   return Stemmer.stem(w);
+               } catch (Exception e) {
+                   return "";
                }
-           } catch (Exception e) {
-               System.err.println("[ERROR] Error processing word: " + word + " - " + e.getMessage());
-           }
+           });
+
+            if (stemmedWord.isEmpty()) continue;
+
+            Token token = tokenMap.computeIfAbsent(stemmedWord, k -> new Token(k));
+            token.increment();
+            token.addPosition(i);
        }
-       
-       // Calculate term frequency (TF)
+
        int totalTerms = tokenMap.values().stream().mapToInt(t -> (int)t.count).sum();
        if (totalTerms > 0) {
            tokenMap.forEach((key, token) -> token.count = token.count / totalTerms);
        }
-       
+
        fillTags(doc, tokenMap);
        return tokenMap;
    }
 
-   private int countOccurrences(String text, String token) {
-       if (text == null || text.isEmpty()) {
-           return 0;
-       }
-       
-       String processedText = processHeadingText(text);
+   private int countWordOccurrences(String text, String word) {
        int count = 0;
-       int index = 0;
-       
-       while ((index = processedText.indexOf(token, index)) != -1) {
+       int wordLength = word.length();
+       int pos = 0;
+
+       while ((pos = text.indexOf(word, pos)) >= 0) {
            count++;
-           index += token.length();
+           pos += wordLength;
        }
-       
+
        return count;
    }
 
    public void fillTags(Document doc, HashMap<String, Token> tokenMap) {
-       for (String token : tokenMap.keySet()) {
-           Token t = tokenMap.get(token);
-           t.tags.clear(); // Clear existing tags to rebuild
-           
-           // Process title occurrences
-           String title = doc.getString("title");
-           int titleCount = countOccurrences(title, token);
-           for (int i = 0; i < titleCount; i++) {
-               t.tags.add("title");
+       for (Token token : tokenMap.values()) {
+           token.tags = new ArrayList<>(token.positions.size());
+           for (int i = 0; i < token.positions.size(); i++) {
+               token.tags.add("body");
            }
-           
-           // Process h1 occurrences
-           List<String> h1s = doc.getList("h1s", String.class);
-           if (h1s != null) {
-               for (String h1 : h1s) {
-                   int h1Count = countOccurrences(h1, token);
-                   for (int i = 0; i < h1Count; i++) {
-                       t.tags.add("h1");
+       }
+
+       processTagsForField(doc, "title", "title", tokenMap);
+
+       List<String> h1s = doc.getList("h1s", String.class);
+       if (h1s != null) {
+           for (String h1 : h1s) {
+               processTagsForField(doc, h1, "h1", tokenMap);
+           }
+       }
+
+       List<String> h2s = doc.getList("h2s", String.class);
+       if (h2s != null) {
+           for (String h2 : h2s) {
+               processTagsForField(doc, h2, "h2", tokenMap);
+           }
+       }
+
+       List<String> h3s = doc.getList("h3s", String.class);
+       if (h3s != null) {
+           for (String h3 : h3s) {
+               processTagsForField(doc, h3, "h3", tokenMap);
+           }
+       }
+
+       List<String> h456s = doc.getList("h456s", String.class);
+       if (h456s != null) {
+           for (String h456 : h456s) {
+               processTagsForField(doc, h456, "h456", tokenMap);
+           }
+       }
+   }
+
+   private void processTagsForField(Document doc, String text, String tagName, HashMap<String, Token> tokenMap) {
+       if (text == null || text.isEmpty()) return;
+
+       String processedText = processHeadingText(text);
+       for (Map.Entry<String, Token> entry : tokenMap.entrySet()) {
+           String token = entry.getKey();
+           int count = countWordOccurrences(processedText, token);
+           if (count > 0) {
+               Token t = entry.getValue();
+               int replaced = 0;
+               for (int i = 0; i < t.tags.size() && replaced < count; i++) {
+                   if ("body".equals(t.tags.get(i))) {
+                       t.tags.set(i, tagName);
+                       replaced++;
                    }
-               }
-           }
-           
-           // Process h2 occurrences
-           List<String> h2s = doc.getList("h2s", String.class);
-           if (h2s != null) {
-               for (String h2 : h2s) {
-                   int h2Count = countOccurrences(h2, token);
-                   for (int i = 0; i < h2Count; i++) {
-                       t.tags.add("h2");
-                   }
-               }
-           }
-           
-           // Process h3 occurrences
-           List<String> h3s = doc.getList("h3s", String.class);
-           if (h3s != null) {
-               for (String h3 : h3s) {
-                   int h3Count = countOccurrences(h3, token);
-                   for (int i = 0; i < h3Count; i++) {
-                       t.tags.add("h3");
-                   }
-               }
-           }
-           
-           // Process h456 occurrences
-           List<String> h456s = doc.getList("h456s", String.class);
-           if (h456s != null) {
-               for (String h456 : h456s) {
-                   int h456Count = countOccurrences(h456, token);
-                   for (int i = 0; i < h456Count; i++) {
-                       t.tags.add("h456");
-                   }
-               }
-           }
-           
-           // Fill remaining positions with "body" tags
-           int positionsCount = t.positions.size();
-           int tagsCount = t.tags.size();
-           
-           if (tagsCount < positionsCount) {
-               for (int i = 0; i < positionsCount - tagsCount; i++) {
-                   t.tags.add("body");
                }
            }
        }
