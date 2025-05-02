@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import ranker.Ranker;
 import org.bson.Document;
-import db.DBManager;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -38,7 +37,6 @@ public class Main {
 
         // Access the database (it will create it if it doesn't exist)
         MongoDatabase database = mongoClient.getDatabase("searchengine");
-        DBManager db = new DBManager();
 
         // Access the collection (it will create it if it doesn't exist)
         MongoCollection<org.bson.Document> docsCollection =
