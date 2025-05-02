@@ -13,12 +13,14 @@ import com.mongodb.client.model.Indexes;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.stereotype.Component;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+@Component
 public class DBManager {
     private final MongoClient mongoClient;
     private final MongoCollection<Document> docCollection;
@@ -274,6 +276,18 @@ public class DBManager {
         System.out.println("[DEBUG] Document marked as indexed without processing: " + docId);
     }
 
+//    public List<String> getDocumentsForWord(String word) {
+//        List<String> docIds = new ArrayList<>();
+//        Document query = new Document("term", word);
+//        Document result = indexCollection.find(query).first();
+//        if (result != null) {
+//            Document postings = result.get("postings", Document.class);
+//            if (postings != null) {
+//                docIds.addAll(postings.keySet());
+//            }
+//        }
+//        return docIds;
+//    }
 
     public Map<String, Document> getDocumentsForWord(String word) {
         Map<String, Document> documentsWithData = new HashMap<>();
