@@ -143,7 +143,7 @@ public class Main {
 
 
         long actualPageRankStartTime = System.currentTimeMillis();
-        Map<String, Double> pageRank = Ranker.calculatePageRank(reverseGraph, db, URLGraph);
+        Map<String, Double> pageRank = Ranker.calculatePageRank(reverseGraph, URLGraph);
         long actualPageRankEndTime = System.currentTimeMillis();
 
         MongoCollection<org.bson.Document> rankCollection = database.getCollection("pageRanks");

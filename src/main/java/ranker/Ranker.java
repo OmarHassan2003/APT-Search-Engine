@@ -84,7 +84,7 @@ public class Ranker {
     return sumOfDifferences;
   }
 
-  public static Map<String, Double> calculatePageRank(Map<String, List<String>> reverseGraph, DBManager database, Map<String, List<String>> URLGraph) {
+  public static Map<String, Double> calculatePageRank(Map<String, List<String>> reverseGraph, Map<String, List<String>> URLGraph) {
     Map<String, Double> pageRank = new HashMap<>();
     double dampingFactor = 0.85;
     double prevIteration = 100;
