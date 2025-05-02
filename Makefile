@@ -2,6 +2,7 @@
 CRAWLER_MAIN_CLASS=Crawler.Main
 INDEXER_MAIN_CLASS=Indexer.Main
 PROCESSOR_MAIN_CLASS=processor.tony
+RANKER_MAIN_CLASS = ranker.main
 SERVER_MAIN_CLASS=
 # Target to build the Maven project
 build:
@@ -20,6 +21,9 @@ run-processor: build
 
 run-server: build
 	mvn exec:java -Dexec.mainClass="$(SERVER_MAIN_CLASS)"
+
+run-ranker: build
+	mvn -e exec:java -Dexec.mainClass="$(RANKER_MAIN_CLASS)"
 
 # Target to run tests
 test: build

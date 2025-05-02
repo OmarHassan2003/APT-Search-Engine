@@ -2,6 +2,8 @@ package processor;
 
 
 import db.DBManager;
+import ranker.RankedDocument;
+import ranker.Ranker;
 
 import java.util.List;
 
@@ -14,15 +16,15 @@ public class tony {
         QueryProcessor processor = new QueryProcessor(db);
 
         // 2. Test your queries
-        testQuery(processor, "travel guide");
-        testQuery(processor, "\"travel guide\"");
-        testQuery(processor, "\"travel guide\" AND \"europe tips\"");
-        testQuery(processor, "\"summer vacat\" AND \"vacat plan\"");
-        testQuery(processor, "\"summer vacat\" OR \"fun\"");
-        testQuery(processor, "\"vacat plan\" NOT \"summer vacat\"");
-        testQuery(processor, "\"summer\"");
-        testQuery(processor,  "summer");
-        testQuery(processor, "\"vacat plan\"");
+          testQuery(processor, "travel guide");
+//        testQuery(processor, "\"travel guide\"");
+//        testQuery(processor, "\"travel guide\" AND \"europe tips\"");
+//        testQuery(processor, "\"summer vacat\" AND \"vacat plan\"");
+//        testQuery(processor, "\"summer vacat\" OR \"fun\"");
+//        testQuery(processor, "\"vacat plan\" NOT \"summer vacat\"");
+//        testQuery(processor, "\"summer\"");
+//        testQuery(processor,  "summer");
+//        testQuery(processor, "\"vacat plan\"");
 
 
         System.out.println("finished");
@@ -32,6 +34,15 @@ public class tony {
     public static void testQuery(QueryProcessor processor, String query) {
         System.out.println("Query: " + query);
         QueryResult result = processor.processQuery(query,0,10);
+        System.out.println("Result: " + result.getTotalCount());
+        List<RankedDocument> ans = Ranker.RankerMain(result, db);
+        System.out.println("in tony");
+
+        for (int i = 0; i < ans.size(); i++) {
+            RankedDocument d = ans.get(i);
+            System.out.println("Score + " + d.getScore() + " " + d.getUrl());
+        }
+
         System.out.println("docIDs: " + result.getDocIds());
         System.out.println("docData: " + result.getDocData());
         System.out.println("Query Type: " + result.getType());

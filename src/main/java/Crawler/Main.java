@@ -11,7 +11,9 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
-import Ranker.Ranker;
+import ranker.Ranker;
+import org.bson.Document;
+import db.DBManager;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -36,6 +38,7 @@ public class Main {
 
         // Access the database (it will create it if it doesn't exist)
         MongoDatabase database = mongoClient.getDatabase("searchengine");
+        DBManager db = new DBManager();
 
         // Access the collection (it will create it if it doesn't exist)
         MongoCollection<org.bson.Document> docsCollection =
@@ -112,8 +115,9 @@ public class Main {
         }
 
         Map<String, List<String>> URLGraph = new HashMap<>();
+        MongoCollection<org.bson.Document> collection = database.getCollection("URLsList");
 
-        for (Document doc : collection.find()) {
+        for (org.bson.Document doc : collection.find()) {
             String url = doc.getString("url");
             List<String> urlsList = (List<String>) doc.get("URLsList");
 
@@ -122,11 +126,30 @@ public class Main {
             }
         }
 
-        Map<String, Double> pageRank = Ranker.calculatePageRank(URLGraph);
+        System.out.println("starting pageRanker");
+        long startTimeRanking = System.currentTimeMillis();
+
+        Map<String, List<String>> reverseGraph = new HashMap<>();
+
+        for (org.bson.Document doc : collection.find()) {
+            String fromUrl = doc.getString("url");
+            List<String> toUrls = (List<String>) doc.get("URLsList");
+
+            if (fromUrl != null && toUrls != null) {
+                for (String toUrl : toUrls) {
+                    reverseGraph.computeIfAbsent(toUrl, k -> new ArrayList<>()).add(fromUrl);
+                }
+            }
+        }
+
+
+
+        long actualPageRankStartTime = System.currentTimeMillis();
+        Map<String, Double> pageRank = Ranker.calculatePageRank(reverseGraph, db, URLGraph);
+        long actualPageRankEndTime = System.currentTimeMillis();
 
         MongoCollection<org.bson.Document> rankCollection = database.getCollection("pageRanks");
 
-        Map<String, Double> pageRank = Ranker.calculatePageRank(URLGraph);
 
         List<org.bson.Document> documents = new ArrayList<>();
         for (Map.Entry<String, Double> entry : pageRank.entrySet()) {
@@ -136,6 +159,11 @@ public class Main {
         }
 
         rankCollection.insertMany(documents);
+
+        long endTimeRanking = System.currentTimeMillis();
+
+        System.out.println("Ranking finished in " + (endTimeRanking - startTimeRanking) + "ms");
+        System.out.println("pagerank finished in " + (actualPageRankEndTime - actualPageRankStartTime) + "ms");
 
         mongoClient.close();
     }
