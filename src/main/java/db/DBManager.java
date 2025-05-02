@@ -25,10 +25,11 @@ public class DBManager {
     private final MongoClient mongoClient;
     private final MongoCollection<Document> docCollection;
     private final MongoCollection<Document> indexCollection;
+    private final MongoDatabase database;
 
     // Optimized bulk write batch size for balance of performance and memory usage
     private static final int BULK_WRITE_BATCH_SIZE = 500;
-    
+
     // Connection pool sized for optimal throughput
     private static final int MAX_CONNECTIONS = 100;
 
@@ -37,7 +38,7 @@ public class DBManager {
 
         MongoClientSettings settings = MongoClientSettings.builder()
             .applyConnectionString(new ConnectionString("mongodb://localhost:27017"))
-            .applyToConnectionPoolSettings(builder -> 
+            .applyToConnectionPoolSettings(builder ->
                 builder.maxSize(MAX_CONNECTIONS)
                       .minSize(20) // Minimum size for connection pool
                       .maxWaitTime(2000, TimeUnit.MILLISECONDS) // Reduced wait time
@@ -46,18 +47,18 @@ public class DBManager {
                 builder.connectTimeout(5000, TimeUnit.MILLISECONDS) // Reduced connect timeout
                       .readTimeout(30000, TimeUnit.MILLISECONDS))
             .build();
-            
+
         this.mongoClient = MongoClients.create(settings);
-        MongoDatabase database = mongoClient.getDatabase("searchengine");
+        this.database = mongoClient.getDatabase("searchengine");
 
         this.docCollection = database.getCollection("Crawled_Documents");
         this.indexCollection = database.getCollection("inverted_index");
-        
+
         // Create indexes if they don't exist (only needed once)
         createIndexes();
-     
+
     }
-    
+
     // Create MongoDB indexes to speed up queries.
     private void createIndexes() {
         try {
@@ -68,12 +69,12 @@ public class DBManager {
                     break;
                 }
             }
-            
+
             if (!hasIsIndexedIndex) {
                 docCollection.createIndex(Indexes.ascending("isIndexed"));
                 System.out.println("[INFO] Created index on isIndexed field");
             }
-            
+
             boolean hasTermIndex = false;
             for (Document index : indexCollection.listIndexes()) {
                 if (index.get("name", "").toString().contains("term_1")) {
@@ -81,7 +82,7 @@ public class DBManager {
                     break;
                 }
             }
-            
+
             if (!hasTermIndex) {
                 indexCollection.createIndex(Indexes.ascending("term"));
                 System.out.println("[INFO] Created index on term field in inverted index");
@@ -127,7 +128,7 @@ public class DBManager {
     // Optimize fetching unindexed documents with projection and streaming
     public List<Document> getUnIndexedDocs(int limit) {
         List<Document> docs = new ArrayList<>();
-        
+
         // Minimize fields retrieved to reduce memory usage
         Document projection = new Document("_id", 1)
                                 .append("title", 1)
@@ -136,21 +137,21 @@ public class DBManager {
                                 .append("h2s", 1)
                                 .append("h3s", 1)
                                 .append("h456s", 1);
-        
+
         // Use a batch size to limit the number of documents fetched at once
-        int batchSize = Math.min(50, limit);                        
+        int batchSize = Math.min(50, limit);
         try (MongoCursor<Document> cursor = docCollection.find(Filters.eq("isIndexed", false))
                                         .projection(projection)
                                         .batchSize(batchSize)
                                         .limit(limit)
                                         .hint(Indexes.ascending("isIndexed"))
                                         .iterator()) {
-            
+
             int count = 0;
             while (cursor.hasNext()) {
                 docs.add(cursor.next());
                 count++;
-                
+
                 // Check memory usage periodically and clean if necessary
                 if (count % 20 == 0 && isMemoryUsageHigh()) {
                     System.out.println("[DEBUG] Memory usage high during document fetch - suggesting cleanup");
@@ -158,7 +159,7 @@ public class DBManager {
                 }
             }
         } // Cursor automatically closes when leaving this block
-        
+
         return docs;
     }
 
@@ -188,7 +189,7 @@ public class DBManager {
 
 
         List<String> termKeys = new ArrayList<>(tokens.keySet());
-        
+
         for (String term : termKeys) {
             Token token = tokens.get(term);
             if (token == null || token.positions.isEmpty()) {
@@ -214,10 +215,10 @@ public class DBManager {
             );
 
             updates.add(updateModel);
-            
+
             // Remove processed entry immediately to free memory
             tokens.remove(term);
-            
+
             // Execute batch if we've reached the batch size threshold
             batchCounter++;
             if (batchCounter >= BULK_WRITE_BATCH_SIZE || isMemoryUsageHigh()) {
@@ -227,7 +228,7 @@ public class DBManager {
                 updates.clear();
                 batchCounter = 0;
                 System.gc();
-                
+
                 // Add small pause to allow GC to work
                 try {
                     Thread.sleep(50);
@@ -243,9 +244,9 @@ public class DBManager {
             System.out.println("[DEBUG] Tokens successfully inserted into inverted_index. Final batch size: " + updates.size());
             updates.clear();
         }
-        
+
         markDocumentAsIndexed(docId);
-        
+
         // Clear all references to help garbage collection
         tokens.clear();
         termKeys.clear();
@@ -253,13 +254,13 @@ public class DBManager {
     }
 
     private boolean isMemoryUsageHigh() {
-        
+
         Runtime runtime = Runtime.getRuntime();
         long maxMemory = runtime.maxMemory();
         long usedMemory = runtime.totalMemory() - runtime.freeMemory();
-        
+
         double usedPercentage = (double)usedMemory / maxMemory * 100.0;
-        
+
         if (usedPercentage > 70.0) {  // Using a simple 70% threshold
             System.out.println("[DEBUG] Memory usage high: " + usedPercentage + "%");
             return true;
@@ -329,6 +330,24 @@ public class DBManager {
             }
         }
         return positions;
+    }
+
+    public Map<String, Double> getPageRank() {
+        Map<String, Double> pageRankMap = new HashMap<>();
+
+        MongoCollection<Document> collection = database.getCollection("pageRanks");
+
+        FindIterable<Document> documents = collection.find();
+        for (Document doc : documents) {
+            String url = doc.getString("url");
+            Double rank = doc.getDouble("rank");
+
+            if (url != null && rank != null) {
+                pageRankMap.put(url, rank);
+            }
+        }
+
+        return pageRankMap;
     }
 
 }
