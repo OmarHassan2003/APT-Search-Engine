@@ -1,34 +1,72 @@
 package processor;
 
-import java.util.Set;
 import java.util.List;
+import java.util.Map;
 
 public class QueryResult {
-    private final Set<String> documents;
-    private final String type;
-    private final long duration;
-    private final List<String> queryWords;
+    private List<String> docIds;
+    private List<Map<String, Object>> docData;
+    private String type;
+    private long time;
+    private List<String> queryWords;
+    private List<String> queryWordsString;
+    private Integer totalCount;
 
-    public QueryResult(Set<String> documents, String type, long duration, List<String> queryWords) {
-        this.documents = documents;
-        this.type = type;
-        this.duration = duration;
-        this.queryWords = queryWords;
+    public QueryResult() {
     }
 
-    public Set<String> getDocuments() {
-        return documents;
+    public List<String> getDocIds() {
+        return docIds;
+    }
+
+    public void setDocIds(List<String> docIds) {
+        this.docIds = docIds;
+    }
+
+    public List<Map<String, Object>> getDocData() {
+        return docData;
+    }
+
+    public void setDocData(List<Map<String, Object>> docData) {
+        this.docData = docData;
     }
 
     public String getType() {
         return type;
     }
 
-    public long getDuration() {
-        return duration;
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public long getTime() {
+        return time;
+    }
+
+    public void setTime(long time) {
+        this.time = time;
     }
 
     public List<String> getQueryWords() {
         return queryWords;
+    }
+
+    public void setQueryWords(List<String> queryWords) {
+        this.queryWords = queryWords;
+    }
+
+    public List<String> getQueryWordsString() {
+        return queryWordsString;
+    }
+
+    public void setQueryWordsString(List<String> queryWordsString) {
+        this.queryWordsString = queryWordsString;
+    }
+
+    public Integer getTotalCount() {
+        return totalCount;
+    }
+    public void setTotalCount(Integer totalCount) {
+        this.totalCount = totalCount;
     }
 }

@@ -1,40 +1,77 @@
 package processor;
 
-
-import org.apache.lucene.util.fst.PairOutputs;
-
 import db.DBManager;
-
+import org.bson.Document;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-
-
+@Component
 public class QueryProcessor {
     private final DBManager db;
+
     public QueryProcessor(DBManager db) {
         this.db = db;
     }
 
-    public QueryResult processQuery(String query) {
+    public QueryResult processQuery(String query,int page, int size) {
         long start = System.currentTimeMillis();
-        Set<String> result;
-        String type;
         List<String> queryWords;
+        String type;
 
         if (query.contains("\"")) {
             queryWords = extractQueryWordsWithBoolean(query);
-            result = handlePhraseWithBoolean(query);
             type = containsBoolean(query) ? "phrase+boolean" : "phrase";
         } else {
             queryWords = Tokenizer.tokenize(query).stream().map(Stemmer::stem).toList();
-            result = handleNormal(queryWords);
             type = "normal";
         }
 
+        // Process search based on query type
+        Map<String, Document> documentData;
+        if (query.contains("\"")) {
+            documentData = handlePhraseWithBoolean(query);
+        } else {
+            documentData = handleNormal(queryWords);
+        }
+
+        int totalCount = documentData.size();
+
+        // Convert results to desired format
+        List<String> docIds = new ArrayList<>(documentData.keySet());
+        List<Map<String, Object>> docData = new ArrayList<>();
+
+        for (String docId : docIds) {
+            Document doc = documentData.get(docId);
+            Map<String, Object> docInfo = new HashMap<>();
+
+            // Extract data from the document
+            docInfo.put("tf", doc.get("tf"));
+            docInfo.put("positions", doc.get("positions"));
+            docInfo.put("tags", doc.get("tags"));
+            docInfo.put("title", doc.get("title"));
+            docData.add(docInfo);
+        }
+
         long duration = System.currentTimeMillis() - start;
-        return new QueryResult(result, type, duration, queryWords);
+
+        int fromIndex = Math.min(page * size, docIds.size());
+        int toIndex = Math.min(fromIndex + size, docIds.size());
+        List<String> paginatedDocIds = docIds.subList(fromIndex, toIndex);
+        List<Map<String, Object>> paginatedDocData = docData.subList(fromIndex, toIndex);
+
+        // Create the final result in the desired format
+        QueryResult result = new QueryResult();
+        result.setDocIds(paginatedDocIds);
+        result.setDocData(paginatedDocData);
+        result.setType(type);
+        result.setTime(duration);
+        result.setQueryWords(queryWords);
+        result.setQueryWordsString(splitQuery(query));
+        result.setTotalCount(totalCount);
+
+        return result;
     }
 
     private boolean containsBoolean(String query) {
@@ -42,10 +79,10 @@ public class QueryProcessor {
         return q.contains(" and ") || q.contains(" or ") || q.contains(" not ");
     }
 
-    private Set<String> handlePhraseWithBoolean(String query) {
+    private Map<String, Document> handlePhraseWithBoolean(String query) {
         List<String> parts = splitQuery(query);
         List<String> operators = extractOperators(parts);
-        List<Set<String>> results = new ArrayList<>();
+        List<Map<String, Document>> results = new ArrayList<>();
 
         for (String part : parts) {
             if (part.equalsIgnoreCase("AND") || part.equalsIgnoreCase("OR") || part.equalsIgnoreCase("NOT")) continue;
@@ -53,65 +90,39 @@ public class QueryProcessor {
             if (part.startsWith("\"") && part.endsWith("\"")) {
                 String phrase = part.substring(1, part.length() - 1);
                 List<String> tokens = Tokenizer.tokenize(phrase).stream().map(Stemmer::stem).toList();
-                List<String> fields = new ArrayList<>();
                 results.add(phraseSearch(tokens));
             } else {
                 String term = Stemmer.stem(part);
-                results.add(new HashSet<>(db.getDocumentsForWord(term)));
+                results.add(db.getDocumentsForWord(term));
             }
         }
 
-        Set<String> finalSet = results.getFirst();
+        Map<String, Document> finalResult = new HashMap<>(results.getFirst());
         for (int i = 1; i < results.size(); i++) {
             String op = operators.get(i - 1);
-            Set<String> current = results.get(i);
+            Map<String, Document> current = results.get(i);
+
             switch (op) {
-                case "AND" -> finalSet.retainAll(current);
-                case "OR" -> finalSet.addAll(current);
-                case "NOT" -> finalSet.removeAll(current);
+                case "AND" -> finalResult.keySet().retainAll(current.keySet());
+                case "OR" -> current.forEach(finalResult::putIfAbsent);
+                case "NOT" -> current.keySet().forEach(finalResult::remove);
             }
         }
 
-        return finalSet;
+        return finalResult;
     }
 
-    private Set<String> handleNormal(List<String> tokens) {
-        //List<String> tokens = Tokenizer.tokenize(query).stream().map(Stemmer::stem).toList();
-        Set<String> results = null;
-        for (String token : tokens) {
-            Set<String> docs = new HashSet<>(db.getDocumentsForWord(token));
-            if (results == null) results = docs;
-            else results.addAll(docs);
-        }
-        return results != null ? results : new HashSet<>();
-    }
+    private Map<String, Document> phraseSearch(List<String> terms) {
+        Map<String, Document> result = new HashMap<>();
+        List<Map<String, Document>> docLists = terms.stream().map(db::getDocumentsForWord).toList();
+        Set<String> commonDocs = new HashSet<>(docLists.get(0).keySet());
 
-    private List<String> splitQuery(String query) {
-        return Arrays.stream(query.split("(?= AND | OR | NOT )|(?<= AND | OR | NOT )"))
-                .map(String::trim).collect(Collectors.toList());
-    }
-
-    private List<String> extractOperators(List<String> parts) {
-        List<String> filteredOperators = parts.stream()
-                .filter(p -> p.equalsIgnoreCase("AND") || p.equalsIgnoreCase("OR") || p.equalsIgnoreCase("NOT"))
-                .toList();
-
-        return filteredOperators.stream()
-                .map(String::toUpperCase)
-                .collect(Collectors.toList());
-    }
-
-    private Set<String> phraseSearch(List<String> terms) {
-        Set<String> result = new HashSet<>();
-        List<List<String>> docLists = terms.stream().map(db::getDocumentsForWord).toList();
-        Set<String> commonDocs = new HashSet<>(docLists.getFirst());
         for (int i = 1; i < docLists.size(); i++) {
-            commonDocs.retainAll(docLists.get(i));
+            commonDocs.retainAll(docLists.get(i).keySet());
         }
-
 
         for (String docId : commonDocs) {
-            List<Integer> firstPositions = db.getPositionsForWord(terms.getFirst(), docId);
+            List<Integer> firstPositions = db.getPositionsForWord(terms.get(0), docId);
             for (int pos : firstPositions) {
                 boolean match = true;
                 for (int i = 1; i < terms.size(); i++) {
@@ -122,7 +133,8 @@ public class QueryProcessor {
                     }
                 }
                 if (match) {
-                    result.add(docId);
+                    // Add the document data to results
+                    result.put(docId, docLists.get(0).get(docId));
                     break;
                 }
             }
@@ -131,9 +143,29 @@ public class QueryProcessor {
         return result;
     }
 
+    private Map<String, Document> handleNormal(List<String> tokens) {
+        Map<String, Document> results = new HashMap<>();
+        for (String token : tokens) {
+            Map<String, Document> documentMap = db.getDocumentsForWord(token);
+            results.putAll(documentMap);
+        }
+        return results;
+    }
+
+    private List<String> splitQuery(String query) {
+        return Arrays.stream(query.split("(?= AND | OR | NOT )|(?<= AND | OR | NOT )"))
+                .map(String::trim).collect(Collectors.toList());
+    }
+
+    private List<String> extractOperators(List<String> parts) {
+        return parts.stream()
+                .filter(p -> p.equalsIgnoreCase("AND") || p.equalsIgnoreCase("OR") || p.equalsIgnoreCase("NOT"))
+                .map(String::toUpperCase)
+                .toList();
+    }
+
     private List<String> extractQueryWordsWithBoolean(String query) {
         List<String> parts = splitQuery(query);
-        System.out.println("parts: " + parts);
         List<String> queryWords = new ArrayList<>();
         for (String part : parts) {
             if (part.equalsIgnoreCase("AND") || part.equalsIgnoreCase("OR") || part.equalsIgnoreCase("NOT")) continue;
@@ -144,10 +176,6 @@ public class QueryProcessor {
                 queryWords.add(Stemmer.stem(part));
             }
         }
-        System.out.println("queryWords: " + queryWords);
         return queryWords;
     }
-
 }
-
-

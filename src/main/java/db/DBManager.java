@@ -13,12 +13,14 @@ import com.mongodb.client.model.Indexes;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.stereotype.Component;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+@Component
 public class DBManager {
     private final MongoClient mongoClient;
     private final MongoCollection<Document> docCollection;
@@ -273,17 +275,45 @@ public class DBManager {
         System.out.println("[DEBUG] Document marked as indexed without processing: " + docId);
     }
 
-    public List<String> getDocumentsForWord(String word) {
-        List<String> docIds = new ArrayList<>();
+//    public List<String> getDocumentsForWord(String word) {
+//        List<String> docIds = new ArrayList<>();
+//        Document query = new Document("term", word);
+//        Document result = indexCollection.find(query).first();
+//        if (result != null) {
+//            Document postings = result.get("postings", Document.class);
+//            if (postings != null) {
+//                docIds.addAll(postings.keySet());
+//            }
+//        }
+//        return docIds;
+//    }
+
+    public Map<String, Document> getDocumentsForWord(String word) {
+        Map<String, Document> documentsWithData = new HashMap<>();
+
+        // Create a query to find the term in the inverted index
         Document query = new Document("term", word);
+
+        // Find the document for this term
         Document result = indexCollection.find(query).first();
+
         if (result != null) {
+            // Get the postings document that contains all documents where this term appears
             Document postings = result.get("postings", Document.class);
+
             if (postings != null) {
-                docIds.addAll(postings.keySet());
+                // For each document ID in the postings
+                for (String docId : postings.keySet()) {
+                    // Get the document data (which includes tf, positions, etc.)
+                    Document docData = postings.get(docId, Document.class);
+
+                    // Add this document and its data to our result map
+                    documentsWithData.put(docId, docData);
+                }
             }
         }
-        return docIds;
+
+        return documentsWithData;
     }
 
 

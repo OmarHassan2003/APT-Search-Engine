@@ -3,6 +3,8 @@ package processor;
 
 import db.DBManager;
 
+import java.util.List;
+
 public class tony {
     private static final DBManager db = new DBManager();
     public static void main(String[] args) {
@@ -29,11 +31,13 @@ public class tony {
 
     public static void testQuery(QueryProcessor processor, String query) {
         System.out.println("Query: " + query);
-        QueryResult result = processor.processQuery(query);
-        System.out.println("Type: " + result.getType());
-        System.out.println("Time Taken: " + result.getDuration() + " ms");
-        System.out.println("Docs Found: " + result.getDocuments());
+        QueryResult result = processor.processQuery(query,0,10);
+        System.out.println("docIDs: " + result.getDocIds());
+        System.out.println("docData: " + result.getDocData());
+        System.out.println("Query Type: " + result.getType());
+        System.out.println("Query Time: " + result.getTime() + " ms");
         System.out.println("Query Words: " + result.getQueryWords());
+        System.out.println("Query Words String: " + result.getQueryWordsString());
         System.out.println("---------------------------------------------------");
     }
 }
