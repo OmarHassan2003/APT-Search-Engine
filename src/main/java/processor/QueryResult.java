@@ -79,5 +79,6 @@ public class QueryResult {
         this.perWordResults = perWordResults;
     }
 
+
     // You can add more metadata fields like query time if needed
 }

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Collections;
 import java.util.Comparator;
@@ -17,7 +18,8 @@ public class Ranker {
   public static List<String> originalQueryWords;
   public static Map<String, Double> pageRankScores;
   private static List<RankedDocument> results;
-  private static List<Map<String, Object>> docData;
+  private static Map<String, Map<String, Object>> docData;
+  private static Map<String, RankedDocument> scoreTracker;
   public static Snippeterr snippeter;
   private static String type;
   private static QueryResult res;
@@ -28,14 +30,18 @@ public class Ranker {
     pageRankScores = db.getPageRank();
     snippeter = new Snippeterr();
     res = q;
-    System.out.println("Result: " + q.getTotalCount());
+    //System.out.println("Result: " + q.getTotalCount());
     stemmedQueryWords = q.getQueryWords();
     originalQueryWords = q.getQueryWordsString();
-    docData = q.getDocData();
+    docData = q.getPerWordResults();
     type = q.getType();
+    scoreTracker = new HashMap<>();
 
-    RankDocuments();
-
+    if (!type.equals("phrase"))
+      RankDocuments();
+    else {
+      // call the phrase rank method
+    }
     return results;
   }
 
@@ -59,21 +65,17 @@ public class Ranker {
   }
 
 
-  private static double calculateRelevance(List<String> queryWords, Map<String, Object> docDataForCurrWord, int docsWithWord) {
+  private static double calculateRelevance(int docsWithWord, double tf, List<String> positions) {
     double score = 0.0;
-    for (String word : queryWords) {
-      System.out.println(docsWithWord);
-      double tfidf = (double)(docDataForCurrWord.get("tf")) * (1000 / docsWithWord);
-      if (tfidf == 0.0) continue;
-      List<String> positions = (List<String>)docDataForCurrWord.get("tags");
-      if (positions.size() == 0) score += tfidf * getPositionalWeight("l");
-      else {
-        for (String position : positions) {
-          score += getPositionalWeight(position) * tfidf;
-        }
+    //tem.out.println(docsWithWord);
+    double tfidf = (tf) * (6000 / docsWithWord);
+    if (positions.size() == 0) score += tfidf * getPositionalWeight("l");
+    else {
+      for (String position : positions) {
+        score += getPositionalWeight(position) * tfidf;
       }
     }
-    return queryWords.size() > 0 ? score / queryWords.size() : 0.0;
+    return tfidf;
   }
 
   private static double calcDifference(Map<String, Double> newRanks, Map<String, Double> oldRanks) {
@@ -89,51 +91,69 @@ public class Ranker {
     double dampingFactor = 0.85;
     double prevIteration = 100;
     double convergenceThreshold = 0.001;
+    int N = URLGraph.size();
 
     for (String doc : URLGraph.keySet()) {
-      pageRank.put(doc, (double) 1 / URLGraph.size());
+      pageRank.put(doc, 1.0 / N);
     }
 
-//    for (Map.Entry<String, List<String>> entry : URLGraph.entrySet()) {
-//      System.out.println(entry.getKey());
-//    }
+    Map<String, Integer> outLinkCounts = new HashMap<>();
+    Set<String> knownPages = URLGraph.keySet();
+
+    for (String page : knownPages) {
+      List<String> outLinks = URLGraph.get(page);
+      int validCount = 0;
+      if (outLinks != null) {
+        for (String link : outLinks) {
+          if (knownPages.contains(link)) {
+            validCount++;
+          }
+        }
+      }
+      outLinkCounts.put(page, validCount);
+    }
 
     int iterations = 100;
-    for (int i = 0; i < iterations; i++) { // mby change this, geeks says 100
+    for (int i = 0; i < iterations; i++) {
       Map<String, Double> newRanks = new HashMap<>();
-      double curr = 0;
 
-      for (String targetPage : URLGraph.keySet()) {
+      double danglingRank = 0.0;
+      for (String page : knownPages) {
+        if (outLinkCounts.getOrDefault(page, 0) == 0) {
+          danglingRank += pageRank.get(page);
+        }
+      }
+
+      for (String targetPage : knownPages) {
         double contribution = 0.0;
         List<String> incomingLinks = reverseGraph.getOrDefault(targetPage, Collections.emptyList());
-        for (String sourcePage: incomingLinks) {
-          int outDegree = URLGraph.get(sourcePage).size();
-          if (outDegree > 0) {
-            contribution += pageRank.get(sourcePage) / outDegree;
+        for (String sourcePage : incomingLinks) {
+          int outCount = outLinkCounts.getOrDefault(sourcePage, 0);
+          if (outCount > 0) {
+            contribution += pageRank.get(sourcePage) / outCount;
           }
         }
 
-      double newScore = (1 - dampingFactor) + dampingFactor * contribution;
-      curr += newScore;
-      newRanks.put(targetPage, newScore);
-//        System.out.println("iteration " + i + " " + targetPage + " " + newScore);
+        double newScore = (1 - dampingFactor) / N + dampingFactor * (contribution + danglingRank / N);
+        newRanks.put(targetPage, newScore);
       }
 
-
       double currDiff = calcDifference(newRanks, pageRank);
-//      System.out.println(i + " " + currDiff);
+      System.out.println("iteration: " + i + " " + currDiff);
 
       if (Math.abs(currDiff - prevIteration) < convergenceThreshold) {
         System.out.println("Convergence achieved at iteration: " + (i + 1));
         break;
       }
 
-      System.out.println("iteration: " + i + " " + currDiff);
       pageRank = newRanks;
       prevIteration = currDiff;
     }
+
     return pageRank;
   }
+
+
 
   // travel guide
 
@@ -145,20 +165,34 @@ public class Ranker {
 // }
   // {travel, guide)
 
+
+  // private static Map<String, Map<String, Object>> docData;
   public static void RankDocuments() {
     results = new ArrayList<>();
-    System.out.println("Result: " + res.getTotalCount());
-    for (int i = 0; i < res.getDocIds().size(); i++) {
-      Map<String, Object> docDataForCurrWord = docData.get(i);
-      double relevance = calculateRelevance(stemmedQueryWords, docDataForCurrWord, docDataForCurrWord.size());
-      Document temp = database.getDocumentById(res.getDocIds().get(i));
-      String url = (String)temp.get("url");
-      String title = (String)temp.get("title");
-      System.out.println(pageRankScores.size());
-      double score = relevance * ((pageRankScores.get(url) != null) ? pageRankScores.get(url) : 1 / pageRankScores.size());
-      String snippet = snippeter.generateSnippet((ArrayList<String>)temp.get("ps"), originalQueryWords);
-      RankedDocument r = new RankedDocument(url, score, title, snippet);
-      results.add(r);
+    for (String word : docData.keySet()) {
+      Map<String, Object> docDataForCurrWord = docData.get(word);
+        //tem.out.println("word: " + word);
+      for (String doc : docDataForCurrWord.keySet()) {
+        Map<String, Object> docFields = (Map<String, Object>) docData.get(word).get(doc);
+        double tf = (double)docFields.get("tf");
+        Document temp = database.getDocumentById(doc);
+        String url = (String)temp.get("url");
+        String title = (String)temp.get("title");
+        List<String> positions = (List<String>)docFields.get("tags");
+        double tfidf = calculateRelevance(docDataForCurrWord.size(), tf, positions);
+        if (tfidf == 0.0) continue;
+        double score = tfidf * (pageRankScores.get(url) != null ? pageRankScores.get(url) : 1 / pageRankScores.size());
+        if (scoreTracker.containsKey(url)) {
+          RankedDocument tempp = scoreTracker.get(url);
+          tempp.setScore(tempp.getScore() + score);
+        }
+        else {
+          // need new logic for snippeting (check with tony nagy)
+          RankedDocument r = new RankedDocument(url, score, title, "ana baheb tony nagy");
+          results.add(r);
+          scoreTracker.put(url, r);
+        }
+      }
     }
 
     Collections.sort(results, Comparator.comparingDouble(RankedDocument::getScore).reversed());
