@@ -30,7 +30,7 @@ public class Ranker {
     pageRankScores = db.getPageRank();
     snippeter = new Snippeterr();
     res = q;
-    System.out.println("Result: " + q.getTotalCount());
+    //System.out.println("Result: " + q.getTotalCount());
     stemmedQueryWords = q.getQueryWords();
     originalQueryWords = q.getQueryWordsString();
     docData = q.getPerWordResults();
@@ -67,7 +67,7 @@ public class Ranker {
 
   private static double calculateRelevance(int docsWithWord, double tf, List<String> positions) {
     double score = 0.0;
-    System.out.println(docsWithWord);
+    //tem.out.println(docsWithWord);
     double tfidf = (tf) * (6000 / docsWithWord);
     if (positions.size() == 0) score += tfidf * getPositionalWeight("l");
     else {
@@ -171,8 +171,9 @@ public class Ranker {
     results = new ArrayList<>();
     for (String word : docData.keySet()) {
       Map<String, Object> docDataForCurrWord = docData.get(word);
+        //tem.out.println("word: " + word);
       for (String doc : docDataForCurrWord.keySet()) {
-        Map<String, Object> docFields = (Map<String, Object>) docData.get(doc);
+        Map<String, Object> docFields = (Map<String, Object>) docData.get(word).get(doc);
         double tf = (double)docFields.get("tf");
         Document temp = database.getDocumentById(doc);
         String url = (String)temp.get("url");
@@ -189,7 +190,7 @@ public class Ranker {
           // need new logic for snippeting (check with tony nagy)
           RankedDocument r = new RankedDocument(url, score, title, "ana baheb tony nagy");
           results.add(r);
-          scoreTracker.put(doc, r);
+          scoreTracker.put(url, r);
         }
       }
     }

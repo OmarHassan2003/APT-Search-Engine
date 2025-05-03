@@ -37,11 +37,12 @@ public class QueryProcessor {
         } else {
             termDocumentMap = handleNormal(queryWords);
         }
-
+        //System.out.println("termDocumentMap: " + termDocumentMap);
         Set<String> allDocIds = new HashSet<>();
         for (Map<String, Document> docs : termDocumentMap.values()) {
             allDocIds.addAll(docs.keySet());
         }
+        //System.out.println("allDocIds: " + allDocIds);
 
         List<String> docIds = new ArrayList<>(allDocIds);
         int totalCount = docIds.size();
@@ -49,7 +50,20 @@ public class QueryProcessor {
         int fromIndex = Math.min(page * size, docIds.size());
         int toIndex = Math.min(fromIndex + size, docIds.size());
         List<String> paginatedDocIds = docIds.subList(fromIndex, toIndex);
+        System.out.println("paginatedDocIds: " + paginatedDocIds);
 
+        // Filter termDocumentMap to include only paginatedDocIds
+        Map<String, Map<String, Document>> paginatedTermDocumentMap = new HashMap<>();
+        for (Map.Entry<String, Map<String, Document>> entry : termDocumentMap.entrySet()) {
+            String term = entry.getKey();
+            Map<String, Document> filteredDocs = entry.getValue().entrySet().stream()
+                    .filter(e -> paginatedDocIds.contains(e.getKey()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            paginatedTermDocumentMap.put(term, filteredDocs);
+        }
+        System.out.println("paginatedTermDocumentMap: " + paginatedTermDocumentMap);
+
+        // Build docData for paginated documents
         List<Map<String, Object>> docData = new ArrayList<>();
         for (String docId : paginatedDocIds) {
             Map<String, Object> info = new HashMap<>();
@@ -57,7 +71,7 @@ public class QueryProcessor {
             Map<String, Object> wordInfo = new HashMap<>();
 
             for (String term : queryWords) {
-                Document doc = termDocumentMap.getOrDefault(term, Collections.emptyMap()).get(docId);
+                Document doc = paginatedTermDocumentMap.getOrDefault(term, Collections.emptyMap()).get(docId);
                 if (doc != null) {
                     wordInfo.put(term, Map.of(
                             "tf", doc.get("tf"),
@@ -80,8 +94,9 @@ public class QueryProcessor {
         result.setQueryWords(queryWords);
         result.setQueryWordsString(splitQuery(query));
         result.setTotalCount(totalCount);
-        result.setPerWordResults(formatResultForRanker(termDocumentMap)); // Adjusted method call
+        result.setPerWordResults(formatResultForRanker(paginatedTermDocumentMap)); // Adjusted method call
 
+        System.out.println("result: " + result);
         return result;
     }
 
