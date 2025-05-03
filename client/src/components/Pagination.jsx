@@ -37,7 +37,7 @@ function Pagination({ totalPages = 10, initialPage = 0, onPageChange }) {
           Previous
         </button>
       )}
-      {page > 0 && <div className="px-2 py-2 text-black">{page + 1}</div>}
+      {page > 0 && <div className="px-2 py-2 text-black">{page + 1} of {totalPages}</div>}
       {page < totalPages - 1 && (
         <button
           onClick={() => handlePageChange(page + 1)}

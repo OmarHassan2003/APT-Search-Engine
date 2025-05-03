@@ -23,6 +23,7 @@ function ResultsPage() {
       const response = await searchQuery(query, page);
       setResults(response);
       setTotalPages(Math.ceil(response.totalCount / 10)); // Assuming 10 results per page
+      console.log("Total pages:", Math.ceil(response.totalCount / 10));
       console.log("Fetched results:", response);
     } catch (error) {
       console.error("Error fetching results:", error);
@@ -41,7 +42,7 @@ function ResultsPage() {
 
         <ResultsList results={results} />
 
-        <Pagination totalPages={3} initialPage={page} onPageChange={setPage} />
+        <Pagination totalPages={totalPages} initialPage={page} onPageChange={setPage} />
 
         <div className="mt-auto">
           <Footer />

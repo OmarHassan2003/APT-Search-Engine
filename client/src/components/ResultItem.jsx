@@ -14,7 +14,7 @@ function ResultItem({ result, onClick }) {
     >
       <h3 className="text-lg font-semibold">
         <a
-          href="#"
+          href={result.url}
           className={`cursor-pointer transition-all duration-300 ${
             isVisited ? "text-purple-800" : "text-blue-800"
           } ${isHovered ? "underline" : "no-underline"}`}
@@ -25,7 +25,7 @@ function ResultItem({ result, onClick }) {
           {result.title}
         </a>
       </h3>
-      {/* <p className="pt-1">{result.snippet}</p> */}
+      <p className="pt-1">{result.snippet}</p>
     </div>
   );
 }
