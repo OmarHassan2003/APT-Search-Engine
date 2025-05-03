@@ -13,6 +13,7 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "sans-serif"],
+        baumans: ["Baumans", "cursive"],
       },
     },
   },

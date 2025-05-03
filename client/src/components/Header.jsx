@@ -4,19 +4,20 @@ import SearchBar from "./SearchBar";
 
 function Header({ minimal = false, query = "" }) {
   return (
-    <header className="w-full py-4">
+    (minimal? (
+    <div className="bg-white relative z-10 pb-15">
+    <header className="w-full py-4 fixed top-0 left-0 bg-white">
       <div className="container mx-auto px-4">
         <div className="flex items-center">
-          {minimal && (
-            <>
+          
               <Link to="/" className="mr-10">
-                <h2 className="text-3xl font-bold text-blue-500">Apt Apt</h2>
+                <h2 style={{fontFamily:"Baumans"}}  className="text-3xl font-bold text-blue-500">Search Engine</h2>
               </Link>
               <div className="flex-grow max-w-xl">
                 <SearchBar initialValue={query} compact={true} />
               </div>
-            </>
-          )}
+            
+          
 
           {/* <div className="ml-auto">
             <nav>
@@ -37,6 +38,8 @@ function Header({ minimal = false, query = "" }) {
         </div>
       </div>
     </header>
+    </div>
+    ) : <></>)
   );
 }
 
