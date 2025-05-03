@@ -14,10 +14,12 @@ public class tony {
         QueryProcessor processor = new QueryProcessor(db);
 
         // 2. Test your queries
-        testQuery(processor, "travel guide");
-        testQuery(processor, "\"travel guide\"");
-        testQuery(processor, "\"travel guide\" AND \"europe tips\"");
-
+//        testQuery(processor, "travel guide");
+//        testQuery(processor, "\"travel guide\"");
+//        testQuery(processor, "\"travel guide\" AND \"europe tips\"");
+        String word = "porn";
+        Stemmer.stem(word);
+        System.out.println("Stemmed word: " + word);
 
         System.out.println("finished");
         db.close();

@@ -182,7 +182,7 @@ public class Ranker {
         double tfidf = calculateRelevance(docDataForCurrWord.size(), tf, positions);
         if (tfidf == 0.0) continue;
         double score = tfidf * (pageRankScores.get(url) != null ? pageRankScores.get(url) : 1 / pageRankScores.size());
-        if (scoreTracker.containsKey(doc)) {
+        if (scoreTracker.containsKey(url)) {
           RankedDocument tempp = scoreTracker.get(url);
           tempp.setScore(tempp.getScore() + score);
         }
