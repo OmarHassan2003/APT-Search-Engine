@@ -174,13 +174,16 @@ public class Ranker {
       for (String doc : docDataForCurrWord.keySet()) {
         Map<String, Object> docFields = (Map<String, Object>) docData.get(doc);
         double tf = (double)docFields.get("tf");
+        Document temp = database.getDocumentById(doc);
+        String url = (String)temp.get("url");
+        String title = (String)temp.get("title");
         List<String> positions = (List<String>)docFields.get("tags");
         double tfidf = calculateRelevance(docDataForCurrWord.size(), tf, positions);
         if (tfidf == 0.0) continue;
         double score = tfidf * (pageRankScores.get(url) != null ? pageRankScores.get(url) : 1 / pageRankScores.size());
         if (scoreTracker.containsKey(doc)) {
-          RankedDocument temp = scoreTracker.get(url);
-          temp.setScore(temp.getScore() + score);
+          RankedDocument tempp = scoreTracker.get(url);
+          tempp.setScore(tempp.getScore() + score);
         }
         else {
           // need new logic for snippeting (check with tony nagy)
