@@ -289,33 +289,64 @@ public class DBManager {
 //        return docIds;
 //    }
 
-    public Map<String, Document> getDocumentsForWord(String word) {
-        Map<String, Document> documentsWithData = new HashMap<>();
+//    public Map<String, Document> getDocumentsForWord(String word) {
+//        Map<String, Document> documentsWithData = new HashMap<>();
+//
+//        // Create a query to find the term in the inverted index
+//        Document query = new Document("term", word);
+//
+//        // Find the document for this term
+//        Document result = indexCollection.find(query).first();
+//
+//        if (result != null) {
+//            // Get the postings document that contains all documents where this term appears
+//            Document postings = result.get("postings", Document.class);
+//
+//            if (postings != null) {
+//                // For each document ID in the postings
+//                for (String docId : postings.keySet()) {
+//                    // Get the document data (which includes tf, positions, etc.)
+//                    Document docData = postings.get(docId, Document.class);
+//
+//                    // Add this document and its data to our result map
+//                    documentsWithData.put(docId, docData);
+//                }
+//            }
+//        }
+//
+//        return documentsWithData;
+//    }
+public Map<String, Document> getDocumentsForWord(String word) {
+    Map<String, Document> documentsWithMetadata = new HashMap<>();
 
-        // Create a query to find the term in the inverted index
-        Document query = new Document("term", word);
+    // Create a query to find the term in the inverted index
+    Document query = new Document("term", word);
 
-        // Find the document for this term
-        Document result = indexCollection.find(query).first();
+    // Find the document for this term
+    Document result = indexCollection.find(query).first();
+    if (result != null) {
+        // Get the postings document that contains all documents where this term appears
+        Document postings = result.get("postings", Document.class);
+        if (postings != null) {
+            // For each document ID in the postings
+            for (String docId : postings.keySet()) {
+                // Get the document data (including term frequency, positions, etc.)
+                Document docData = postings.get(docId, Document.class);
 
-        if (result != null) {
-            // Get the postings document that contains all documents where this term appears
-            Document postings = result.get("postings", Document.class);
+                // Create a new document to hold the metadata (TF, positions, etc.)
+                Document documentWithMetadata = new Document("tf", docData.get("tf"))
+                        .append("positions", docData.get("positions"))
+                        .append("tags", docData.get("tags"))
+                        .append("title", docData.get("title"));
 
-            if (postings != null) {
-                // For each document ID in the postings
-                for (String docId : postings.keySet()) {
-                    // Get the document data (which includes tf, positions, etc.)
-                    Document docData = postings.get(docId, Document.class);
-
-                    // Add this document and its data to our result map
-                    documentsWithData.put(docId, docData);
-                }
+                // Add this document with metadata to the result map
+                documentsWithMetadata.put(docId, documentWithMetadata);
             }
         }
-
-        return documentsWithData;
     }
+
+    return documentsWithMetadata;
+}
 
 
     public List<Integer> getPositionsForWord(String word, String docId) {

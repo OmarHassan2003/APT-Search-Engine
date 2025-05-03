@@ -5,15 +5,15 @@ import java.util.Map;
 
 public class QueryResult {
     private List<String> docIds;
-    private List<Map<String, Object>> docData;
+    private List<Map<String, Object>> docData; // Changed to a custom object for better clarity
     private String type;
     private long time;
     private List<String> queryWords;
     private List<String> queryWordsString;
-    private Integer totalCount;
+    private long totalCount;  // Changed to long
+    private Map<String, Map<String, Object>> perWordResults; // Added for ranker
 
-    public QueryResult() {
-    }
+    // Getters and setters
 
     public List<String> getDocIds() {
         return docIds;
@@ -63,10 +63,21 @@ public class QueryResult {
         this.queryWordsString = queryWordsString;
     }
 
-    public Integer getTotalCount() {
+    public long getTotalCount() {
         return totalCount;
     }
-    public void setTotalCount(Integer totalCount) {
+
+    public void setTotalCount(long totalCount) {
         this.totalCount = totalCount;
     }
+
+    public Map<String, Map<String, Object>> getPerWordResults() {
+        return perWordResults;
+    }
+
+    public void setPerWordResults(Map<String, Map<String, Object>> perWordResults) {
+        this.perWordResults = perWordResults;
+    }
+
+    // You can add more metadata fields like query time if needed
 }
