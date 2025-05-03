@@ -17,6 +17,10 @@ public class RankedDocument {
     return url;
   }
 
+  public void setScore(Double score) {
+    this.score = score;
+  }
+
   public Double getScore() {
     return score;
   }
