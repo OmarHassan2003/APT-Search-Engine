@@ -24,7 +24,11 @@ function ResultsPage() {
       const response = await searchQuery(query);
       setResults(response);
       setTotalPages(Math.ceil(response.totalCount / 10)); // Assuming 10 results per page
-      setPageData(response.results ? response.results.slice(0, 10) : []);
+      const limit = response.results
+        ? Math.min(10, response.results.length)
+        : 0;
+      setPageData(response.results ? response.results.slice(0, limit) : []);
+      setPage(0); // Reset to the first page
 
       console.log("Total pages:", Math.ceil(response.totalCount / 10));
       console.log("Fetched results:", response);
@@ -38,8 +42,10 @@ function ResultsPage() {
     fetchResults(query);
   }, [query]);
   useEffect(() => {
-    if (page <= totalPages) {
-      setPageData(results.results ? results.results.slice(page, 10) : []);
+    if (page <= totalPages && results.results) {
+      const startIndex = page * 10;
+      const endIndex = Math.min(startIndex + 10, results.results.length);
+      setPageData(results.results.slice(startIndex, endIndex) || []);
       console.log("Page data:", pageData);
     }
   }, [page]);
