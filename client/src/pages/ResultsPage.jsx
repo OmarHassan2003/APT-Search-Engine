@@ -55,7 +55,7 @@ function ResultsPage() {
       <div className="flex flex-col min-h-screen bg-white text-gray-900">
         <Header minimal={true} query={query} />
 
-        <ResultsList results={pageData} totalTime={results.totalTime} />
+        <ResultsList totalCount={results.totalCount} results={pageData} totalTime={results.totalTime} />
 
         <Pagination
           totalPages={totalPages}
