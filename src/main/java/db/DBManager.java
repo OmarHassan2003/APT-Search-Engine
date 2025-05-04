@@ -18,6 +18,7 @@ import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -316,37 +317,37 @@ public class DBManager {
 //
 //        return documentsWithData;
 //    }
-public Map<String, Document> getDocumentsForWord(String word) {
-    Map<String, Document> documentsWithMetadata = new HashMap<>();
+    public Map<String, Document> getDocumentsForWord(String word) {
+        Map<String, Document> documentsWithMetadata = new HashMap<>();
 
-    // Create a query to find the term in the inverted index
-    Document query = new Document("term", word);
+        // Create a query to find the term in the inverted index
+        Document query = new Document("term", word);
 
-    // Find the document for this term
-    Document result = indexCollection.find(query).first();
-    if (result != null) {
-        // Get the postings document that contains all documents where this term appears
-        Document postings = result.get("postings", Document.class);
-        if (postings != null) {
-            // For each document ID in the postings
-            for (String docId : postings.keySet()) {
-                // Get the document data (including term frequency, positions, etc.)
-                Document docData = postings.get(docId, Document.class);
+        // Find the document for this term
+        Document result = indexCollection.find(query).first();
+        if (result != null) {
+            // Get the postings document that contains all documents where this term appears
+            Document postings = result.get("postings", Document.class);
+            if (postings != null) {
+                // For each document ID in the postings
+                for (String docId : postings.keySet()) {
+                    // Get the document data (including term frequency, positions, etc.)
+                    Document docData = postings.get(docId, Document.class);
 
-                // Create a new document to hold the metadata (TF, positions, etc.)
-                Document documentWithMetadata = new Document("tf", docData.get("tf"))
-                        .append("positions", docData.get("positions"))
-                        .append("tags", docData.get("tags"))
-                        .append("title", docData.get("title"));
+                    // Create a new document to hold the metadata (TF, positions, etc.)
+                    Document documentWithMetadata = new Document("tf", docData.get("tf"))
+                            .append("positions", docData.get("positions"))
+                            .append("tags", docData.get("tags"))
+                            .append("title", docData.get("title"));
 
-                // Add this document with metadata to the result map
-                documentsWithMetadata.put(docId, documentWithMetadata);
+                    // Add this document with metadata to the result map
+                    documentsWithMetadata.put(docId, documentWithMetadata);
+                }
             }
         }
-    }
 
-    return documentsWithMetadata;
-}
+        return documentsWithMetadata;
+    }
 
 
     public List<Integer> getPositionsForWord(String word, String docId) {
@@ -361,6 +362,95 @@ public Map<String, Document> getDocumentsForWord(String word) {
             }
         }
         return positions;
+    }
+
+    public Map<String, Map<String, Document>> getDocumentsForWords(List<String> words) {
+        Map<String, Map<String, Document>> termDocs = new ConcurrentHashMap<>();
+        FindIterable<Document> results = indexCollection.find(Filters.in("term", words));
+        for (Document result : results) {
+            String term = result.getString("term");
+            Document postings = result.get("postings", Document.class);
+            if (postings != null) {
+                Map<String, Document> docs = new ConcurrentHashMap<>();
+                for (String docId : postings.keySet()) {
+                    Document docData = postings.get(docId, Document.class);
+                    docs.put(docId, new Document("tf", docData.get("tf"))
+                            .append("positions", docData.get("positions"))
+                            .append("tags", docData.get("tags"))
+                            .append("title", docData.get("title")));
+                }
+                termDocs.put(term, docs);
+            }
+        }
+        return termDocs;
+    }
+
+    public Map<String, List<Integer>> getPositionsForWords(List<String> words, String docId) {
+        Map<String, List<Integer>> termPositions = new ConcurrentHashMap<>();
+        FindIterable<Document> results = indexCollection.find(Filters.in("term", words));
+        for (Document result : results) {
+            String term = result.getString("term");
+            Document postings = result.get("postings", Document.class);
+            if (postings != null && postings.containsKey(docId)) {
+                Document docData = postings.get(docId, Document.class);
+                termPositions.put(term, (List<Integer>) docData.get("positions"));
+            }
+        }
+        return termPositions;
+    }
+
+    public Map<String, Map<String, List<Integer>>> getPositionsForWordsBatch(List<String> terms, List<String> candidateDocIds) {
+        // Handle empty input
+        if (terms.isEmpty() || candidateDocIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        // Build aggregation pipeline
+        List<Document> pipeline = new ArrayList<>();
+
+        // Stage 1: Match documents where term is in the terms list
+        Document matchStage = new Document("$match", new Document("term", new Document("$in", terms)));
+        pipeline.add(matchStage);
+
+        // Stage 2: Convert postings object to array of { k: docId, v: { tf, positions, tags, title } }
+        Document objectToArrayStage = new Document("$addFields", new Document("postingsArray",
+                new Document("$objectToArray", "$postings")
+        ));
+        pipeline.add(objectToArrayStage);
+
+        // Stage 3: Unwind the postingsArray
+        Document unwindStage = new Document("$unwind", "$postingsArray");
+        pipeline.add(unwindStage);
+
+        // Stage 4: Match postings where docId (postingsArray.k) is in candidateDocIds
+        Document matchPostingsStage = new Document("$match", new Document("postingsArray.k", new Document("$in", candidateDocIds)));
+        pipeline.add(matchPostingsStage);
+
+        // Stage 5: Project to reshape the output
+        Document projectStage = new Document("$project", new Document()
+                .append("term", 1)
+                .append("docId", "$postingsArray.k")
+                .append("positions", "$postingsArray.v.positions")
+                .append("_id", 0));
+        pipeline.add(projectStage);
+
+        // Execute aggregation
+        AggregateIterable<Document> results = indexCollection.aggregate(pipeline);
+
+        // Process results into the required map structure
+        Map<String, Map<String, List<Integer>>> termDocPositions = new HashMap<>();
+        for (Document doc : results) {
+            String term = doc.getString("term");
+            String docId = doc.getString("docId");
+            List<Integer> positions = doc.getList("positions", Integer.class);
+
+            termDocPositions.computeIfAbsent(term, k -> new HashMap<>())
+                    .put(docId, positions);
+        }
+
+        //System.out.println("getPositionsForWordsBatch: Terms " + terms + ", CandidateDocIds " + candidateDocIds);
+        //System.out.println("getPositionsForWordsBatch: Results " + termDocPositions);
+        return termDocPositions;
     }
 
     public Map<String, Double> getPageRank() {

@@ -32,19 +32,19 @@ public class Snippeterr {
       int score = calculateRelevanceScore(paragraph, queryWords);
 
       if (paragraph.length() <= SNIPPET_LENGTH && (numberOfTerms > bestNumberOfTerms || numberOfTerms == bestNumberOfTerms && score > bestScore)) {
-        System.out.println(score);
+        //System.out.println(score);
         bestSnippet = paragraph;
         bestScore = score;
         bestNumberOfTerms = numberOfTerms;
-        System.out.println(bestSnippet);
+        //System.out.println(bestSnippet);
       }
     }
 
     for (String term : queryWords) {
-      System.out.println(term);
+      //System.out.println(term);
       bestSnippet = highlightQueryTerm(bestSnippet, term);
     }
-    System.out.println(bestSnippet);
+    //System.out.println(bestSnippet);
     return bestSnippet;
   }
 

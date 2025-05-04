@@ -5,14 +5,22 @@ import org.bson.Document;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.BitSet;
 
 @Component
 public class QueryProcessor {
     private final DBManager db;
+    private final ExecutorService executor;
 
     public QueryProcessor(DBManager db) {
         this.db = db;
+        this.executor = Executors.newWorkStealingPool();
     }
 
     public QueryResult processQuery(String query, int page, int size) {
@@ -26,7 +34,7 @@ public class QueryProcessor {
             type = containsBoolean(query) ? "phrase+boolean" : "phrase";
         } else {
             queryWords = Tokenizer.tokenize(query).stream().map(Stemmer::stem).toList();
-            type = "normal";
+            type = containsBoolean(query) ? "normal+boolean" : "normal";
         }
 
         Map<String, Map<String, Document>> termDocumentMap;
@@ -37,66 +45,71 @@ public class QueryProcessor {
         } else {
             termDocumentMap = handleNormal(queryWords);
         }
-        //System.out.println("termDocumentMap: " + termDocumentMap);
+
         Set<String> allDocIds = new HashSet<>();
         for (Map<String, Document> docs : termDocumentMap.values()) {
             allDocIds.addAll(docs.keySet());
         }
-        //System.out.println("allDocIds: " + allDocIds);
 
         List<String> docIds = new ArrayList<>(allDocIds);
         int totalCount = docIds.size();
 
-        int fromIndex = Math.min(page * size, docIds.size());
-        int toIndex = Math.min(fromIndex + size, docIds.size());
-        List<String> paginatedDocIds = docIds.subList(fromIndex, toIndex);
-        System.out.println("paginatedDocIds: " + paginatedDocIds);
-
-        // Filter termDocumentMap to include only paginatedDocIds
-        Map<String, Map<String, Document>> paginatedTermDocumentMap = new HashMap<>();
-        for (Map.Entry<String, Map<String, Document>> entry : termDocumentMap.entrySet()) {
+        // docDataMap
+        // {
+        //  "url_1": {
+        //    "words": {
+        //      "travel": { "tf": 1, "positions": [1], "tags": ["p"] },
+        //      "guide": { "tf": 1, "positions": [2], "tags": ["p"] },
+        //      "sports": { "tf": 1, "positions": [5], "tags": ["p"] }
+        //    }
+        //  }
+        //}
+        Map<String, Map<String, Map<String, Object>>> docDataMap = new ConcurrentHashMap<>();
+        termDocumentMap.entrySet().parallelStream().forEach(entry -> {
             String term = entry.getKey();
-            Map<String, Document> filteredDocs = entry.getValue().entrySet().stream()
-                    .filter(e -> paginatedDocIds.contains(e.getKey()))
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-            paginatedTermDocumentMap.put(term, filteredDocs);
-        }
-        System.out.println("paginatedTermDocumentMap: " + paginatedTermDocumentMap);
-
-        // Build docData for paginated documents
-        List<Map<String, Object>> docData = new ArrayList<>();
-        for (String docId : paginatedDocIds) {
-            Map<String, Object> info = new HashMap<>();
-            info.put("docId", docId);
-            Map<String, Object> wordInfo = new HashMap<>();
-
-            for (String term : queryWords) {
-                Document doc = paginatedTermDocumentMap.getOrDefault(term, Collections.emptyMap()).get(docId);
-                if (doc != null) {
-                    wordInfo.put(term, Map.of(
-                            "tf", doc.get("tf"),
-                            "positions", doc.get("positions"),
-                            "tags", doc.get("tags")
-                    ));
-                }
-            }
-            info.put("words", wordInfo);
-            docData.add(info);
-        }
+            entry.getValue().forEach((docId, doc) -> {
+                docDataMap.computeIfAbsent(docId, k -> new ConcurrentHashMap<>())
+                        .computeIfAbsent("words", k -> new ConcurrentHashMap<>())
+                        .put(term, Map.of(
+                                "tf", doc.get("tf"),
+                                "positions", doc.get("positions"),
+                                "tags", doc.get("tags")
+                        ));
+            });
+        });
+        // docData
+        // [
+        //  {
+        //    "docId": "url_1",
+        //       "words": {
+        //          travel": { "tf": 1, "positions": [1], "tags": ["p"] },
+        //          "guide": { "tf": 1, "positions": [2], "tags": ["p"] },
+        //          "sports": { "tf": 1, "positions": [5], "tags": ["p"] }
+        //    }
+        //   }
+        //]
+        List<Map<String, Object>> docData = docIds.stream()
+                .map(docId -> {
+                    Map<String, Object> info = new HashMap<>();
+                    info.put("docId", docId);
+                    info.put("words", docDataMap.getOrDefault(docId, new ConcurrentHashMap<>()).getOrDefault("words", new HashMap<>()));
+                    return info;
+                })
+                .collect(Collectors.toList());
 
         long duration = System.currentTimeMillis() - start;
 
         QueryResult result = new QueryResult();
-        result.setDocIds(paginatedDocIds);
+        result.setDocIds(docIds);
+        System.out.println("docIds: " + docIds);
         result.setDocData(docData);
         result.setType(type);
         result.setTime(duration);
         result.setQueryWords(queryWords);
         result.setQueryWordsString(splitQuery(query));
         result.setTotalCount(totalCount);
-        result.setPerWordResults(formatResultForRanker(paginatedTermDocumentMap)); // Adjusted method call
+        result.setPerWordResults(formatResultForRanker(termDocumentMap));
 
-        System.out.println("result: " + result);
         return result;
     }
 
@@ -106,123 +119,167 @@ public class QueryProcessor {
     }
 
     private Map<String, Map<String, Document>> handleNormal(List<String> terms) {
-        Map<String, Map<String, Document>> results = new HashMap<>();
-        for (String term : terms) {
-            results.put(term, db.getDocumentsForWord(term));
-        }
+        List<String> filteredTerms = terms.stream()
+                .filter(t -> !t.equalsIgnoreCase("AND") && !t.equalsIgnoreCase("OR") && !t.equalsIgnoreCase("NOT"))
+                .toList();
+
+        Map<String, Map<String, Document>> results = db.getDocumentsForWords(filteredTerms);
         return results;
     }
 
     private Map<String, Map<String, Document>> handlePhrase(List<String> terms) {
-        Map<String, Map<String, Document>> termDocs = handleNormal(terms);
+        Map<String, Map<String, Document>> termDocs = db.getDocumentsForWords(terms);
 
-        Set<String> commonDocs = new HashSet<>(termDocs.get(terms.get(0)).keySet());
-        for (int i = 1; i < terms.size(); i++) {
-            commonDocs.retainAll(termDocs.get(terms.get(i)).keySet());
-        }
+        Map<String, Integer> docIdToIndex = new ConcurrentHashMap<>();
+        AtomicInteger indexCounter = new AtomicInteger(0);
+        termDocs.values().forEach(docs -> docs.keySet().forEach(docId ->
+                docIdToIndex.computeIfAbsent(docId, k -> indexCounter.getAndIncrement())));
 
-        Set<String> matchedDocs = new HashSet<>();
-
-        for (String docId : commonDocs) {
-            boolean matched = checkPhraseMatch(terms, docId);
-            if (matched) matchedDocs.add(docId);
-        }
-
-        Map<String, Map<String, Document>> phraseResults = new HashMap<>();
+        BitSet commonDocs = new BitSet();
+        boolean first = true;
         for (String term : terms) {
-            Map<String, Document> filtered = new HashMap<>();
-            for (String docId : matchedDocs) {
-                filtered.put(docId, termDocs.get(term).get(docId));
+            Map<String, Document> docs = termDocs.getOrDefault(term, new HashMap<>());
+            BitSet docSet = new BitSet();
+            docs.keySet().forEach(docId -> docSet.set(docIdToIndex.get(docId)));
+            if (first) {
+                commonDocs.or(docSet);
+                first = false;
+            } else {
+                commonDocs.and(docSet);
             }
-            phraseResults.put(term, filtered);
         }
+
+        List<String> candidateDocIds = commonDocs.stream()
+                .mapToObj(index -> docIdToIndex.entrySet().stream()
+                        .filter(entry -> entry.getValue() == index)
+                        .map(Map.Entry::getKey)
+                        .findFirst()
+                        .orElse(null))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        Map<String, Map<String, List<Integer>>> allPositions = db.getPositionsForWordsBatch(terms, candidateDocIds);
+
+        Map<String, Map<String, Document>> phraseResults = new ConcurrentHashMap<>();
+        candidateDocIds.parallelStream()
+                .filter(docId -> checkPhraseMatch(terms, docId, allPositions))
+                .forEach(docId -> {
+                    for (String term : terms) {
+                        phraseResults.computeIfAbsent(term, k -> new ConcurrentHashMap<>())
+                                .put(docId, termDocs.get(term).get(docId));
+                    }
+                });
 
         return phraseResults;
     }
 
-    private boolean checkPhraseMatch(List<String> terms, String docId) {
-        List<List<Integer>> positions = new ArrayList<>();
+    private boolean checkPhraseMatch(List<String> terms, String docId, Map<String, Map<String, List<Integer>>> allPositions) {
+        Map<String, List<Integer>> termPositions = new HashMap<>();
         for (String term : terms) {
-            List<Integer> pos = db.getPositionsForWord(term, docId);
-            if (pos == null) return false;
-            positions.add(pos);
+            Map<String, List<Integer>> positionsForTerm = allPositions.getOrDefault(term, Collections.emptyMap());
+            List<Integer> positions = positionsForTerm.get(docId);
+            if (positions == null || positions.isEmpty()) {
+                return false;
+            }
+            termPositions.put(term, positions);
         }
 
-        Set<Integer> basePositions = new HashSet<>(positions.get(0));
-        for (int i = 1; i < positions.size(); i++) {
+        BitSet basePositions = new BitSet();
+        termPositions.get(terms.get(0)).forEach(pos -> basePositions.set(pos));
+
+        for (int i = 1; i < terms.size(); i++) {
+            BitSet shifted = new BitSet();
             int finalI = i;
-            Set<Integer> shifted = positions.get(i).stream()
-                    .map(p -> p - finalI).collect(Collectors.toSet());
-            basePositions.retainAll(shifted);
-            if (basePositions.isEmpty()) return false;
+            termPositions.get(terms.get(i)).forEach(p -> shifted.set(p - finalI));
+            basePositions.and(shifted);
+            if (basePositions.isEmpty()) {
+                return false;
+            }
         }
 
         return true;
     }
 
     private Map<String, Map<String, Document>> handlePhraseWithBoolean(List<String> queryWords, String query) {
-        List<String> parts = splitQuery(query);
-        List<String> operators = extractOperators(parts);
-        List<Map<String, Map<String, Document>>> results = new ArrayList<>();
+        try {
+            List<String> parts = splitQuery(query);
+            List<String> operators = extractOperators(parts);
+            List<CompletableFuture<Map<String, Map<String, Document>>>> futures = new ArrayList<>();
 
-        for (String part : parts) {
-            if (part.equalsIgnoreCase("AND") || part.equalsIgnoreCase("OR") || part.equalsIgnoreCase("NOT")) continue;
-
-            if (part.startsWith("\"") && part.endsWith("\"")) {
-                String phrase = part.substring(1, part.length() - 1);
-                List<String> tokens = Tokenizer.tokenize(phrase).stream().map(Stemmer::stem).toList();
-                results.add(handlePhrase(tokens));
-            } else {
-                String term = Stemmer.stem(part);
-                results.add(Map.of(term, db.getDocumentsForWord(term)));
+            for (String part : parts) {
+                if (part.equalsIgnoreCase("AND") || part.equalsIgnoreCase("OR") || part.equalsIgnoreCase("NOT")) {
+                    continue;
+                }
+                CompletableFuture<Map<String, Map<String, Document>>> future = CompletableFuture.supplyAsync(() -> {
+                    if (part.startsWith("\"") && part.endsWith("\"")) {
+                        String phrase = part.substring(1, part.length() - 1);
+                        List<String> tokens = Tokenizer.tokenize(phrase).stream().map(Stemmer::stem).toList();
+                        return handlePhrase(tokens);
+                    } else {
+                        String term = Stemmer.stem(part);
+                        return Map.of(term, db.getDocumentsForWord(term));
+                    }
+                }, executor);
+                futures.add(future);
             }
-        }
 
-        Map<String, Map<String, Document>> merged = new HashMap<>(results.get(0));
+            List<Map<String, Map<String, Document>>> results = futures.stream()
+                    .map(CompletableFuture::join)
+                    .toList();
 
-        for (int i = 1; i < results.size(); i++) {
-            String op = operators.get(i - 1);
-            Map<String, Map<String, Document>> current = results.get(i);
+            Map<String, Integer> docIdToIndex = new ConcurrentHashMap<>();
+            AtomicInteger indexCounter = new AtomicInteger(0);
+            results.forEach(termDocs -> termDocs.values().forEach(docs ->
+                    docs.keySet().forEach(docId ->
+                            docIdToIndex.computeIfAbsent(docId, k -> indexCounter.getAndIncrement()))));
 
-            Set<String> allTerms = new HashSet<>();
-            allTerms.addAll(merged.keySet());
-            allTerms.addAll(current.keySet());
+            List<Set<String>> docIdSets = new ArrayList<>();
+            List<Set<String>> termSets = new ArrayList<>();
+            for (Map<String, Map<String, Document>> result : results) {
+                Set<String> docIds = new HashSet<>();
+                result.values().forEach(docs -> docIds.addAll(docs.keySet()));
+                docIdSets.add(docIds);
+                Set<String> terms = new HashSet<>(result.keySet());
+                termSets.add(terms);
+            }
 
-            Map<String, Map<String, Document>> newMerged = new HashMap<>();
-
-            for (String term : allTerms) {
-                Map<String, Document> left = merged.getOrDefault(term, new HashMap<>());
-                Map<String, Document> right = current.getOrDefault(term, new HashMap<>());
-
-                Map<String, Document> mergedDocs = switch (op) {
-                    case "AND" -> {
-                        Set<String> common = new HashSet<>(left.keySet());
-                        common.retainAll(right.keySet());
-                        Map<String, Document> out = new HashMap<>();
-                        for (String docId : common) out.put(docId, left.get(docId));
-                        yield out;
-                    }
-                    case "OR" -> {
-                        Map<String, Document> out = new HashMap<>(left);
-                        right.forEach(out::putIfAbsent);
-                        yield out;
-                    }
-                    case "NOT" -> {
-                        Map<String, Document> out = new HashMap<>(left);
-                        right.keySet().forEach(out::remove);
-                        yield out;
-                    }
-                    default -> new HashMap<>();
+            Set<String> mergedDocIds = new HashSet<>(docIdSets.get(0));
+            for (int i = 1; i < docIdSets.size(); i++) {
+                String op = operators.get(i - 1).toUpperCase();
+                Set<String> currentDocIds = docIdSets.get(i);
+                mergedDocIds = switch (op) {
+                    case "AND" -> { Set<String> result = new HashSet<>(mergedDocIds); result.retainAll(currentDocIds); yield result; }
+                    case "OR" -> { Set<String> result = new HashSet<>(mergedDocIds); result.addAll(currentDocIds); yield result; }
+                    case "NOT" -> { Set<String> result = new HashSet<>(mergedDocIds); result.removeAll(currentDocIds); yield result; }
+                    default -> mergedDocIds;
                 };
-
-                if (!mergedDocs.isEmpty()) newMerged.put(term, mergedDocs);
             }
 
-            merged = newMerged;
-        }
+            Map<String, Map<String, Document>> finalResult = new ConcurrentHashMap<>();
+            for (int i = 0; i < results.size(); i++) {
+                Map<String, Map<String, Document>> partResult = results.get(i);
+                Set<String> partTerms = termSets.get(i);
+                for (String term : partTerms) {
+                    Map<String, Document> docs = partResult.get(term);
+                    Map<String, Document> filteredDocs = new HashMap<>();
+                    for (Map.Entry<String, Document> entry : docs.entrySet()) {
+                        String docId = entry.getKey();
+                        if (mergedDocIds.contains(docId)) {
+                            filteredDocs.put(docId, entry.getValue());
+                        }
+                    }
+                    System.out.println("Filtered docs for term " + term + ": " + filteredDocs);
+                    if (!filteredDocs.isEmpty()) {
+                        finalResult.put(term, filteredDocs);
+                    }
+                }
+            }
 
-        return merged;
+            return finalResult;
+        } finally {
+            // Do not shutdown the executor here; let Spring manage its lifecycle
+        }
     }
+
 
     private List<String> splitQuery(String query) {
         return Arrays.stream(query.split("(?= AND | OR | NOT )|(?<= AND | OR | NOT )"))
@@ -252,28 +309,21 @@ public class QueryProcessor {
     }
 
     private Map<String, Map<String, Object>> formatResultForRanker(Map<String, Map<String, Document>> termDocumentMap) {
-        Map<String, Map<String, Object>> formattedResult = new HashMap<>();
-
-        for (Map.Entry<String, Map<String, Document>> entry : termDocumentMap.entrySet()) {
+        Map<String, Map<String, Object>> formattedResult = new ConcurrentHashMap<>();
+        termDocumentMap.entrySet().parallelStream().forEach(entry -> {
             String term = entry.getKey();
             Map<String, Document> docs = entry.getValue();
-
-            Map<String, Object> docData = new HashMap<>();
-            for (Map.Entry<String, Document> docEntry : docs.entrySet()) {
-                String docId = docEntry.getKey();
-                Document doc = docEntry.getValue();
-
-                Map<String, Object> docInfo = new HashMap<>();
-                docInfo.put("tf", doc.get("tf"));
-                docInfo.put("positions", doc.get("positions"));
-                docInfo.put("tags", doc.get("tags"));
-
+            Map<String, Object> docData = new ConcurrentHashMap<>();
+            docs.forEach((docId, doc) -> {
+                Map<String, Object> docInfo = Map.of(
+                        "tf", doc.get("tf"),
+                        "positions", doc.get("positions"),
+                        "tags", doc.get("tags")
+                );
                 docData.put(docId, docInfo);
-            }
-
+            });
             formattedResult.put(term, docData);
-        }
-
+        });
         return formattedResult;
     }
 }
