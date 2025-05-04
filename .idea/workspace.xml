@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="9b970c0b-842c-4dcc-aa3f-107739171335" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Makefile" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/Crawler/Crawler.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/Crawler/Main.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/Crawler/RobotParser.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/Crawler/URLNormalizer.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/Indexer/Indexer.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/Indexer/Main.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/Indexer/Tokenizer.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/example/demo/HelloController.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/example/demo/Main.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/example/demo/SearchController.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/data/stopwords.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/db/DBManager.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/processor/DocInfo.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/processor/QueryProcessor.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/processor/QueryResult.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/processor/Stemmer.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/processor/Tokenizer.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/processor/tony.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/ranker/RankedDocument.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/ranker/Ranker.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/ranker/Snippeterr.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/ranker/main.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/resources/application.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/java/com/example/demo/DemoApplicationTests.java" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 4
+}]]></component>
+  <component name="ProjectId" id="2weD2rrjCIt7YtyPWrurfNqot8v" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.Main.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/home/antonious/CMP Study/final clone 2/APT-Search-Engine"
+  }
+}]]></component>
+  <component name="RunManager">
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="APT-Search-Engine" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="APT-Search-Engine" />
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="9b970c0b-842c-4dcc-aa3f-107739171335" name="Changes" comment="" />
+      <created>1746392942123</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1746392942123</updated>
+    </task>
+    <servers />
+  </component>
+</project>
