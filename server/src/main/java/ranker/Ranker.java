@@ -309,6 +309,15 @@ public class Ranker {
       List<String> paragraphs = (List<String>) temp.get("ps");
 
       for (String word : queryWordsCurr) {
+        if(docData.get(word) == null) {
+
+          continue;
+        }
+        if(docData.get(word).get(doc) == null) {
+
+          continue;
+        }
+
         Map<String, Object> docFields = (Map<String, Object>) docData.get(word).get(doc);
         double tf = (double) docFields.get("tf");
         List<String> positions = (List<String>) docFields.get("tags");
@@ -319,7 +328,10 @@ public class Ranker {
       totalScore *= (pageRankScores.get(url) != null ? pageRankScores.get(url) : 1.0 / pageRankScores.size());
       if (totalScore == 0.0) continue;
 
+      long start = System.currentTimeMillis();
       String snippet = snippeter.generateSnippet(paragraphs, queryWordsCurr);
+        long duration = System.currentTimeMillis() - start;
+        System.out.println("Snippet generation time: " + duration + " ms for URL: " + url);
       RankedDocument r = new RankedDocument(url, totalScore, title, snippet);
       localResults.add(r);
       localScoreTracker.put(url, r);
