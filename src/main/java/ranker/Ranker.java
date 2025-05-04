@@ -1,14 +1,8 @@
 package ranker;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
-import java.util.Collections;
-import java.util.Comparator;
+
 import org.bson.Document;
 import processor.Stemmer;
 import processor.QueryResult;
@@ -172,32 +166,47 @@ public class Ranker {
 
   // private static Map<String, Map<String, Object>> docData;
   public static void RankDocuments() {
+    long start = System.currentTimeMillis();
     results = new ArrayList<>();
+
+    // Preload all documents
+    Set<String> uniqueDocIds = new HashSet<>();
+    docData.forEach((word, docs) -> uniqueDocIds.addAll(docs.keySet()));
+    Map<String, Document> docCache = database.getDocumentsByIds(new ArrayList<>(uniqueDocIds));
+    if (docCache.isEmpty()) {
+      System.out.println("[DEBUG] No documents found for ranking.");
+      return;
+    }
+
     Thread[] threads = new Thread[docData.keySet().size()];
     int i = 0;
     for (String word : docData.keySet()) {
+      Map<String, Object> docDataForCurrWord = docData.get(word); // Fetch once
       threads[i] = new Thread(() -> {
-        Map<String, Object> docDataForCurrWord = docData.get(word);
         for (String doc : docDataForCurrWord.keySet()) {
-          Map<String, Object> docFields = (Map<String, Object>) docData.get(word).get(doc);
-          double tf = (double)docFields.get("tf");
-          Document temp = database.getDocumentById(doc);
-          String url = (String)temp.get("url");
-          String title = (String)temp.get("title");
-          List<String> positions = (List<String>)docFields.get("tags");
+          Map<String, Object> docFields = (Map<String, Object>) docDataForCurrWord.get(doc); // Use local reference
+          double tf = (double) docFields.get("tf");
+          Document temp = docCache.get(doc);
+          if (temp == null) continue; // Skip if document not found
+          String url = (String) temp.get("url");
+          String title = (String) temp.get("title");
+          List<String> positions = (List<String>) docFields.get("tags");
           double tfidf = calculateRelevance(docDataForCurrWord.size(), tf, positions);
           if (tfidf == 0.0) continue;
-          double score = tfidf * (pageRankScores.get(url) != null ? pageRankScores.get(url) : 1 / pageRankScores.size());
+          double score = tfidf * (pageRankScores.get(url) != null ? pageRankScores.get(url) : 1.0 / pageRankScores.size());
+
+          // Prepare data outside synchronized block
+          List<String> paragraphs = (List<String>) temp.get("ps");
+          String snippet = null;
+          if (!scoreTracker.containsKey(url)) {
+            snippet = snippeter.generateSnippet(paragraphs, originalQueryWords);
+          }
+
           synchronized (scoreTracker) {
             if (scoreTracker.containsKey(url)) {
               RankedDocument tempp = scoreTracker.get(url);
               tempp.setScore(tempp.getScore() + score);
-            }
-            else {
-              // need new logic for snippeting (check with tony nagy)
-              List<String> paragraphs = (List<String>)temp.get("ps");
-              System.out.println("paragraphs: " + paragraphs);
-              String snippet = snippeter.generateSnippet(paragraphs, originalQueryWords);
+            } else {
               RankedDocument r = new RankedDocument(url, score, title, snippet);
               results.add(r);
               scoreTracker.put(url, r);
@@ -215,6 +224,9 @@ public class Ranker {
       }
     }
     Collections.sort(results, Comparator.comparingDouble(RankedDocument::getScore).reversed());
+
+    long duration = System.currentTimeMillis() - start;
+    System.out.println("RankDocuments time: " + duration + " ms for " + uniqueDocIds.size() + " documents");
   }
 
   // private static Map<String, Map<String, Object>> docData;
@@ -380,12 +392,22 @@ public class Ranker {
       Collections.sort(results, Comparator.comparingDouble(RankedDocument::getScore).reversed());
       return;
     }
-
+    System.out.println("in phrase and bool rank");
+    System.out.println("original query words: " + originalQueryWords);
     List<String> queryWords = new ArrayList<>();
     for (String word : originalQueryWords) {
+      System.out.println("word: " + word);
+      if (word.startsWith("\"") && word.endsWith("\"")) {
+        word = word.substring(1, word.length() - 1);
+      }
       if (!word.equalsIgnoreCase("AND") && !word.equalsIgnoreCase("OR") && !word.equalsIgnoreCase("NOT")) {
-        String stemmed = Stemmer.stem(word);
-        queryWords.add(stemmed);
+
+        List<String> queryWordsCurr = Arrays.asList(word.split(" "));
+        System.out.println("query words curr: " + queryWordsCurr);
+        for(String s : queryWordsCurr) {
+          String stemmed = Stemmer.stem(s);
+          queryWords.add(stemmed);
+        }
       }
     }
 

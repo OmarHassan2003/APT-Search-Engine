@@ -55,6 +55,7 @@ public class SearchController {
 
          long start1 = System.currentTimeMillis();
          QueryResult queryresult = queryProcessor.processQuery(query, page, size);
+        System.out.println("query result " + queryresult.getDocIds());
          long duration1 = System.currentTimeMillis() - start1;
          System.out.println("Query processing time: " + duration1 + " ms");
         System.out.println("query time" + queryresult.getTime());

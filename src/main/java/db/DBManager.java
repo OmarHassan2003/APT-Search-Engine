@@ -20,6 +20,7 @@ import com.mongodb.MongoClientSettings;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Component
 public class DBManager {
@@ -124,6 +125,52 @@ public class DBManager {
     // Fetch a document by ID
     public Document getDocumentById(String id) {
         return docCollection.find(Filters.eq("_id", new ObjectId(id))).first();
+    }
+
+    public Map<String, Document> getDocumentsByIds(List<String> docIds) {
+        if (docIds == null || docIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        // Convert string docIds to ObjectId for MongoDB query
+        List<ObjectId> objectIds = docIds.stream()
+                .filter(docId -> {
+                    try {
+                        new ObjectId(docId);
+                        return true;
+                    } catch (IllegalArgumentException e) {
+                        System.err.println("[WARNING] Invalid ObjectId format for docId: " + docId);
+                        return false;
+                    }
+                })
+                .map(ObjectId::new)
+                .collect(Collectors.toList());
+
+        if (objectIds.isEmpty()) {
+            System.out.println("[DEBUG] No valid ObjectIds to query.");
+            return new HashMap<>();
+        }
+
+        // Define projection to fetch only necessary fields
+        Document projection = new Document("_id", 1)
+                .append("url", 1)
+                .append("title", 1)
+                .append("ps", 1);
+
+        // Query using $in to fetch all documents in one batch
+        FindIterable<Document> results = docCollection.find(Filters.in("_id", objectIds))
+                .projection(projection)
+                .batchSize(100); // Optimize for large result sets
+
+        // Build the result map
+        Map<String, Document> docMap = new HashMap<>();
+        for (Document doc : results) {
+            String docId = doc.getObjectId("_id").toString();
+            docMap.put(docId, doc);
+        }
+
+        System.out.println("[DEBUG] getDocumentsByIds: Fetched " + docMap.size() + " documents for " + objectIds.size() + " IDs.");
+        return docMap;
     }
 
     // Optimize fetching unindexed documents with projection and streaming
