@@ -1,7 +1,7 @@
 import axios from "axios";
 const backendUrl = "http://localhost:8080";
 
-export const searchQuery = async (query, page) => {
+export const searchQuery = async (query) => {
   try {
     // Get existing search history from localStorage
     const searchHistory = JSON.parse(
@@ -33,7 +33,6 @@ export const searchQuery = async (query, page) => {
     const response = await axios.get(`${backendUrl}/search`, {
       params: {
         query: query,
-        page: page,
       },
     });
 

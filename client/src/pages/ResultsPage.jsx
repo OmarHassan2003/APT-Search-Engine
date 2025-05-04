@@ -13,16 +13,18 @@ function ResultsPage() {
   const queryParams = new URLSearchParams(location.search);
   const query = queryParams.get("q") || "";
   const [results, setResults] = useState([]);
+  const [pageData, setPageData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const fetchResults = async (query, page) => {
+  const fetchResults = async (query) => {
     setIsLoading(true);
     try {
-      const response = await searchQuery(query, page);
+      const response = await searchQuery(query);
       setResults(response);
       setTotalPages(Math.ceil(response.totalCount / 10)); // Assuming 10 results per page
+      setPageData(response.results ? response.results.slice(0, 10) : []);
       console.log("Total pages:", Math.ceil(response.totalCount / 10));
       console.log("Fetched results:", response);
     } catch (error) {
@@ -32,17 +34,26 @@ function ResultsPage() {
     }
   };
   useEffect(() => {
-    fetchResults(query, page);
-  }, [query, page]);
+    fetchResults(query);
+  }, [query]);
+  useEffect(() => {
+    if (page <= totalPages) {
+      setPageData(response.results ? response.results.slice(page, 10) : []);
+    }
+  }, [page]);
 
   return (
     (isLoading && <LoadingSpinner />) || (
       <div className="flex flex-col min-h-screen bg-white text-gray-900">
         <Header minimal={true} query={query} />
 
-        <ResultsList results={results} />
+        <ResultsList results={pageData} />
 
-        <Pagination totalPages={totalPages} initialPage={page} onPageChange={setPage} />
+        <Pagination
+          totalPages={totalPages}
+          initialPage={page}
+          onPageChange={setPage}
+        />
 
         <div className="mt-auto">
           <Footer />
