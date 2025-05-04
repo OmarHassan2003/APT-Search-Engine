@@ -448,8 +448,8 @@ public class DBManager {
                     .put(docId, positions);
         }
 
-        System.out.println("getPositionsForWordsBatch: Terms " + terms + ", CandidateDocIds " + candidateDocIds);
-        System.out.println("getPositionsForWordsBatch: Results " + termDocPositions);
+        //System.out.println("getPositionsForWordsBatch: Terms " + terms + ", CandidateDocIds " + candidateDocIds);
+        //System.out.println("getPositionsForWordsBatch: Results " + termDocPositions);
         return termDocPositions;
     }
 

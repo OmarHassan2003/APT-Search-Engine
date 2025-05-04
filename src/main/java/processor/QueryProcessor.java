@@ -20,7 +20,6 @@ public class QueryProcessor {
 
     public QueryProcessor(DBManager db) {
         this.db = db;
-        // Use a dynamic thread pool based on available processors
         this.executor = Executors.newWorkStealingPool();
     }
 
@@ -118,16 +117,13 @@ public class QueryProcessor {
     }
 
     private Map<String, Map<String, Document>> handlePhrase(List<String> terms) {
-        // Batch fetch documents for all terms
         Map<String, Map<String, Document>> termDocs = db.getDocumentsForWords(terms);
 
-        // Map docIds to unique indices to avoid hash collisions
         Map<String, Integer> docIdToIndex = new ConcurrentHashMap<>();
         AtomicInteger indexCounter = new AtomicInteger(0);
         termDocs.values().forEach(docs -> docs.keySet().forEach(docId ->
                 docIdToIndex.computeIfAbsent(docId, k -> indexCounter.getAndIncrement())));
 
-        // Find common documents using BitSet
         BitSet commonDocs = new BitSet();
         boolean first = true;
         for (String term : terms) {
@@ -142,8 +138,6 @@ public class QueryProcessor {
             }
         }
 
-
-        // Batch fetch positions for all common documents
         List<String> candidateDocIds = commonDocs.stream()
                 .mapToObj(index -> docIdToIndex.entrySet().stream()
                         .filter(entry -> entry.getValue() == index)
@@ -152,10 +146,8 @@ public class QueryProcessor {
                         .orElse(null))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
-        // Assuming DBManager supports batch fetching positions for multiple docIds
         Map<String, Map<String, List<Integer>>> allPositions = db.getPositionsForWordsBatch(terms, candidateDocIds);
 
-        // Filter for phrase matches
         Map<String, Map<String, Document>> phraseResults = new ConcurrentHashMap<>();
         candidateDocIds.parallelStream()
                 .filter(docId -> checkPhraseMatch(terms, docId, allPositions))
@@ -170,7 +162,6 @@ public class QueryProcessor {
     }
 
     private boolean checkPhraseMatch(List<String> terms, String docId, Map<String, Map<String, List<Integer>>> allPositions) {
-        // Fetch positions from the pre-fetched map
         Map<String, List<Integer>> termPositions = new HashMap<>();
         for (String term : terms) {
             Map<String, List<Integer>> positionsForTerm = allPositions.getOrDefault(term, Collections.emptyMap());
@@ -203,7 +194,6 @@ public class QueryProcessor {
             List<String> operators = extractOperators(parts);
             List<CompletableFuture<Map<String, Map<String, Document>>>> futures = new ArrayList<>();
 
-            // Process each query part asynchronously
             for (String part : parts) {
                 if (part.equalsIgnoreCase("AND") || part.equalsIgnoreCase("OR") || part.equalsIgnoreCase("NOT")) {
                     continue;
@@ -221,90 +211,77 @@ public class QueryProcessor {
                 futures.add(future);
             }
 
-            // Wait for all parts to complete
             List<Map<String, Map<String, Document>>> results = futures.stream()
                     .map(CompletableFuture::join)
                     .toList();
 
-            // Map docIds to unique indices for all documents in results
             Map<String, Integer> docIdToIndex = new ConcurrentHashMap<>();
             AtomicInteger indexCounter = new AtomicInteger(0);
             results.forEach(termDocs -> termDocs.values().forEach(docs ->
                     docs.keySet().forEach(docId ->
                             docIdToIndex.computeIfAbsent(docId, k -> indexCounter.getAndIncrement()))));
 
-            // Apply boolean operations
-            Map<String, Map<String, Document>> merged = new ConcurrentHashMap<>(results.get(0));
-            for (int i = 1; i < results.size(); i++) {
-                String op = operators.get(i - 1).toUpperCase();
-                Map<String, Map<String, Document>> current = results.get(i);
+            // Combine results by docIds first
+            List<Set<String>> docIdSets = new ArrayList<>();
+            List<Set<String>> termSets = new ArrayList<>();
+            for (Map<String, Map<String, Document>> result : results) {
+                Set<String> docIds = new HashSet<>();
+                result.values().forEach(docs -> docIds.addAll(docs.keySet()));
+                docIdSets.add(docIds);
 
-                Set<String> allTerms = new HashSet<>();
-                allTerms.addAll(merged.keySet());
-                allTerms.addAll(current.keySet());
-
-                Map<String, Map<String, Document>> newMerged = new ConcurrentHashMap<>();
-                Map<String, Map<String, Document>> finalMerged = merged;
-                allTerms.parallelStream().forEach(term -> {
-                    Map<String, Document> left = finalMerged.getOrDefault(term, new HashMap<>());
-                    Map<String, Document> right = current.getOrDefault(term, new HashMap<>());
-
-                    Map<String, Document> mergedDocs = switch (op) {
-                        case "AND" -> {
-                            Map<String, Document> out = new HashMap<>();
-                            BitSet leftDocs = new BitSet();
-                            left.keySet().forEach(docId -> leftDocs.set(docIdToIndex.get(docId)));
-                            for (String docId : right.keySet()) {
-                                if (leftDocs.get(docIdToIndex.get(docId))) {
-                                    out.put(docId, left.get(docId));
-                                }
-                            }
-                            yield out;
-                        }
-                        case "OR" -> {
-                            Map<String, Document> out = new HashMap<>();
-                            BitSet allDocs = new BitSet();
-                            left.keySet().forEach(docId -> allDocs.set(docIdToIndex.get(docId)));
-                            right.keySet().forEach(docId -> allDocs.set(docIdToIndex.get(docId)));
-                            docIdToIndex.forEach((docId, index) -> {
-                                if (allDocs.get(index)) {
-                                    Document doc = left.getOrDefault(docId, right.get(docId));
-                                    if (doc != null) {
-                                        out.put(docId, doc);
-                                    }
-                                }
-                            });
-                            yield out;
-                        }
-                        case "NOT" -> {
-                            Map<String, Document> out = new HashMap<>();
-                            BitSet leftDocs = new BitSet();
-                            BitSet rightDocs = new BitSet();
-                            left.keySet().forEach(docId -> leftDocs.set(docIdToIndex.get(docId)));
-                            right.keySet().forEach(docId -> rightDocs.set(docIdToIndex.get(docId)));
-                            leftDocs.andNot(rightDocs);
-                            docIdToIndex.forEach((docId, index) -> {
-                                if (leftDocs.get(index)) {
-                                    Document doc = left.get(docId);
-                                    if (doc != null) {
-                                        out.put(docId, doc);
-                                    }
-                                }
-                            });
-                            yield out;
-                        }
-                        default -> new HashMap<>();
-                    };
-
-                    if (!mergedDocs.isEmpty()) {
-                        newMerged.put(term, mergedDocs);
-                    }
-                });
-
-                merged = newMerged;
+                Set<String> terms = new HashSet<>(result.keySet());
+                termSets.add(terms);
             }
 
-            return merged;
+            // Apply boolean operations on docId sets
+            Set<String> mergedDocIds = new HashSet<>(docIdSets.get(0));
+            for (int i = 1; i < docIdSets.size(); i++) {
+                String op = operators.get(i - 1).toUpperCase();
+                Set<String> currentDocIds = docIdSets.get(i);
+
+                mergedDocIds = switch (op) {
+                    case "AND" -> {
+                        Set<String> result = new HashSet<>(mergedDocIds);
+                        result.retainAll(currentDocIds);
+                        yield result;
+                    }
+                    case "OR" -> {
+                        Set<String> result = new HashSet<>(mergedDocIds);
+                        result.addAll(currentDocIds);
+                        yield result;
+                    }
+                    case "NOT" -> {
+                        Set<String> result = new HashSet<>(mergedDocIds);
+                        result.removeAll(currentDocIds);
+                        yield result;
+                    }
+                    default -> mergedDocIds;
+                };
+            }
+
+            // Build the final result map
+            Map<String, Map<String, Document>> finalResult = new ConcurrentHashMap<>();
+            for (int i = 0; i < results.size(); i++) {
+                Map<String, Map<String, Document>> partResult = results.get(i);
+                Set<String> partTerms = termSets.get(i);
+
+                for (String term : partTerms) {
+                    Map<String, Document> docs = partResult.get(term);
+                    Map<String, Document> filteredDocs = new HashMap<>();
+                    for (Map.Entry<String, Document> entry : docs.entrySet()) {
+                        String docId = entry.getKey();
+                        if (mergedDocIds.contains(docId)) {
+                            filteredDocs.put(docId, entry.getValue());
+                        }
+                    }
+                    System.out.println("Filtered docs for term " + term + ": " + filteredDocs);
+                    if (!filteredDocs.isEmpty()) {
+                        finalResult.put(term, filteredDocs);
+                    }
+                }
+            }
+
+            return finalResult;
         } finally {
             // Do not shutdown the executor here; let Spring manage its lifecycle
         }
