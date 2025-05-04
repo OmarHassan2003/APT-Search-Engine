@@ -25,6 +25,7 @@ function ResultsPage() {
       setResults(response);
       setTotalPages(Math.ceil(response.totalCount / 10)); // Assuming 10 results per page
       setPageData(response.results ? response.results.slice(0, 10) : []);
+
       console.log("Total pages:", Math.ceil(response.totalCount / 10));
       console.log("Fetched results:", response);
     } catch (error) {
@@ -38,7 +39,8 @@ function ResultsPage() {
   }, [query]);
   useEffect(() => {
     if (page <= totalPages) {
-      setPageData(response.results ? response.results.slice(page, 10) : []);
+      setPageData(results.results ? results.results.slice(page, 10) : []);
+      console.log("Page data:", pageData);
     }
   }, [page]);
 
@@ -47,7 +49,7 @@ function ResultsPage() {
       <div className="flex flex-col min-h-screen bg-white text-gray-900">
         <Header minimal={true} query={query} />
 
-        <ResultsList results={pageData} />
+        <ResultsList results={pageData} totalTime={results.totalTime} />
 
         <Pagination
           totalPages={totalPages}
