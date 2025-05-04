@@ -37,10 +37,11 @@ public class Ranker {
     type = q.getType();
     scoreTracker = new HashMap<>();
 
-    if (!type.equals("phrase"))
+    if (!type.equals("phrase") && !type.equals("phrase+boolean"))
       RankDocuments();
     else {
       // call the phrase rank method
+
     }
     return results;
   }
@@ -188,7 +189,10 @@ public class Ranker {
         }
         else {
           // need new logic for snippeting (check with tony nagy)
-          RankedDocument r = new RankedDocument(url, score, title, "ana baheb tony nagy");
+          List<String> paragraphs = (List<String>)temp.get("ps");
+          System.out.println("paragraphs: " + paragraphs);
+          String snippet = snippeter.generateSnippet(paragraphs, originalQueryWords);
+          RankedDocument r = new RankedDocument(url, score, title, snippet);
           results.add(r);
           scoreTracker.put(url, r);
         }
