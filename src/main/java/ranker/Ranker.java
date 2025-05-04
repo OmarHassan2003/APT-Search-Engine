@@ -170,34 +170,53 @@ public class Ranker {
   // private static Map<String, Map<String, Object>> docData;
   public static void RankDocuments() {
     results = new ArrayList<>();
+    Thread[] threads = new Thread[docData.keySet().size()];
+    int i = 0;
     for (String word : docData.keySet()) {
-      Map<String, Object> docDataForCurrWord = docData.get(word);
-        //tem.out.println("word: " + word);
-      for (String doc : docDataForCurrWord.keySet()) {
-        Map<String, Object> docFields = (Map<String, Object>) docData.get(word).get(doc);
-        double tf = (double)docFields.get("tf");
-        Document temp = database.getDocumentById(doc);
-        String url = (String)temp.get("url");
-        String title = (String)temp.get("title");
-        List<String> positions = (List<String>)docFields.get("tags");
-        double tfidf = calculateRelevance(docDataForCurrWord.size(), tf, positions);
-        if (tfidf == 0.0) continue;
-        double score = tfidf * (pageRankScores.get(url) != null ? pageRankScores.get(url) : 1 / pageRankScores.size());
-        if (scoreTracker.containsKey(url)) {
-          RankedDocument tempp = scoreTracker.get(url);
-          tempp.setScore(tempp.getScore() + score);
+      threads[i] = new Thread(() -> {
+        Map<String, Object> docDataForCurrWord = docData.get(word);
+
+        for (String doc : docDataForCurrWord.keySet()) {
+          Map<String, Object> docFields = (Map<String, Object>) docData.get(word).get(doc);
+          double tf = (double)docFields.get("tf");
+          Document temp = database.getDocumentById(doc);
+          String url = (String)temp.get("url");
+          String title = (String)temp.get("title");
+          List<String> positions = (List<String>)docFields.get("tags");
+          double tfidf = calculateRelevance(docDataForCurrWord.size(), tf, positions);
+          if (tfidf == 0.0) continue;
+          double score = tfidf * (pageRankScores.get(url) != null ? pageRankScores.get(url) : 1 / pageRankScores.size());
+
+          synchronized (scoreTracker) {
+            if (scoreTracker.containsKey(url)) {
+              RankedDocument tempp = scoreTracker.get(url);
+              tempp.setScore(tempp.getScore() + score);
+            }
+
+            else {
+              // need new logic for snippeting (check with tony nagy)
+              List<String> paragraphs = (List<String>)temp.get("ps");
+              //System.out.println("paragraphs: " + paragraphs);
+              String snippet = snippeter.generateSnippet(paragraphs, originalQueryWords);
+              RankedDocument r = new RankedDocument(url, score, title, snippet);
+              results.add(r);
+              scoreTracker.put(url, r);
+            }
+          }
+
         }
-        else {
-          // need new logic for snippeting (check with tony nagy)
-          List<String> paragraphs = (List<String>)temp.get("ps");
-          System.out.println("paragraphs: " + paragraphs);
-          String snippet = snippeter.generateSnippet(paragraphs, originalQueryWords);
-          RankedDocument r = new RankedDocument(url, score, title, snippet);
-          results.add(r);
-          scoreTracker.put(url, r);
-        }
+      });
+      threads[i++].start();
+    }
+
+    for (Thread thread : threads) {
+      try {
+        thread.join();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
       }
     }
+
 
     Collections.sort(results, Comparator.comparingDouble(RankedDocument::getScore).reversed());
   }
