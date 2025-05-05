@@ -1,6 +1,5 @@
 import { useLocation } from "react-router-dom";
 import Header from "../components/Header";
-
 import Footer from "../components/Footer";
 import { searchQuery } from "../services/api";
 import Pagination from "../components/Pagination";
@@ -52,7 +51,7 @@ function ResultsPage() {
 
   return (
     (isLoading && <LoadingSpinner />) || (
-      <div className="flex flex-col min-h-screen bg-white text-gray-900">
+      <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
         <Header minimal={true} query={query} />
 
         <ResultsList
