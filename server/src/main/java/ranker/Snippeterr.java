@@ -1,11 +1,5 @@
 package ranker;
 
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
-
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,20 +25,21 @@ public class Snippeterr {
     for (String paragraph : paragraphs) {
       int score = calculateRelevanceScore(paragraph, queryWords);
 
-      if (paragraph.length() <= SNIPPET_LENGTH && (numberOfTerms > bestNumberOfTerms || numberOfTerms == bestNumberOfTerms && score > bestScore)) {
-        //System.out.println(score);
+      if (paragraph.length() <= SNIPPET_LENGTH && (numberOfTerms > bestNumberOfTerms
+          || numberOfTerms == bestNumberOfTerms && score > bestScore)) {
+        // System.out.println(score);
         bestSnippet = paragraph;
         bestScore = score;
         bestNumberOfTerms = numberOfTerms;
-        //System.out.println(bestSnippet);
+        // System.out.println(bestSnippet);
       }
     }
 
     for (String term : queryWords) {
-      //System.out.println(term);
+      // System.out.println(term);
       bestSnippet = highlightQueryTerm(bestSnippet, term);
     }
-    //System.out.println(bestSnippet);
+    // System.out.println(bestSnippet);
     return bestSnippet;
   }
 
@@ -52,10 +47,12 @@ public class Snippeterr {
     int score = 0;
     numberOfTerms = 0;
     for (String term : queryWords) {
-      if (term == null || term.isEmpty()) continue;
+      if (term == null || term.isEmpty())
+        continue;
       int frequency = countFrequency(text.toLowerCase(), term.toLowerCase());
       score += frequency;
-      if (frequency != 0) numberOfTerms++;
+      if (frequency != 0)
+        numberOfTerms++;
     }
 
     return score;
@@ -76,7 +73,8 @@ public class Snippeterr {
   }
 
   private String highlightQueryTerm(String snippet, String term) {
-    if (term == null || term.isEmpty()) return snippet;
+    if (term == null || term.isEmpty())
+      return snippet;
 
     String escapedTerm = Pattern.quote(term);
     Pattern pattern = Pattern.compile(escapedTerm, Pattern.CASE_INSENSITIVE);
