@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Search } from "lucide-react";
 import SearchSuggestions from "./SearchSuggestions";
 import { getSuggestions } from "../services/api";
 
@@ -88,7 +89,12 @@ function SearchBar({ initialValue = "", compact = false }) {
             onChange={handleInputChange}
             onFocus={handleInputFocus}
             placeholder="Search..."
-            className={`w-full border border-gray-300 dark:border-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 ${
+            className={`w-full border border-gray-300 dark:border-gray-700 shadow-sm focus:ring-0 focus:outline-none focus:border-gray-300 dark:focus:border-gray-700 ${
+              showSuggestions && suggestions.length > 0
+                ? "rounded-t-3xl"
+                : "rounded-full"
+            }     
+            } bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 ${
               compact ? "py-2 px-4 pr-10" : "py-3 px-4 pr-12"
             }`}
             autoComplete="off"
@@ -100,22 +106,13 @@ function SearchBar({ initialValue = "", compact = false }) {
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className={`${
-                compact ? "h-4 w-4" : "h-5 w-5"
-              } dark:stroke-gray-300`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke={isHovering ? "#000000" : "#808080"}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
+            <Search
+              className={`${compact ? "h-4 w-4" : "h-5 w-5"} ${
+                isHovering
+                  ? "text-black dark:text-white"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            />
           </button>
         </div>
       </form>
