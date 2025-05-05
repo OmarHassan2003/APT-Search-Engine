@@ -1,17 +1,11 @@
 import { useState } from "react";
 
-function ResultItem({ result, onClick }) {
+function ResultItem({ result }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVisited, setIsVisited] = useState(false);
 
   return (
-    <div
-      className="my-3"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(result);
-      }}
-    >
+    <div className="my-3">
       <h3 className="text-lg font-semibold">
         <a
           href={result.url}
@@ -25,7 +19,12 @@ function ResultItem({ result, onClick }) {
           {result.title}
         </a>
       </h3>
-      <p className="pt-1">{result.snippet}</p>
+
+      {/* Highlighted HTML snippet rendered here */}
+      <p
+        className="pt-1"
+        dangerouslySetInnerHTML={{ __html: result.snippet }}
+      />
     </div>
   );
 }
